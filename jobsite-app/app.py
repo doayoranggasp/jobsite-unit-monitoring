@@ -39,12 +39,27 @@ def get_gsheets_connection():
         return None
 
 # ==========================================
+# SIDEBAR NAVIGATION & FILE UPLOADER
+# ==========================================
+st.sidebar.title("🚜 Jobsite Fleet System")
+st.sidebar.caption("System Monitoring & Mob-Demob Real-Time")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("📂 Upload Data Master")
+uploaded_file = st.sidebar.file_uploader("Upload file Excel MSE600 (.xlsx)", type=["xlsx", "xls"])
+
+menu = st.sidebar.radio(
+    "Navigasi Menu",
+    ["📊 Dashboard Overview", "🔍 Master Data Unit", "🚚 Form Mob / Demob", "📜 Log Transaksi Permanen"]
+)
+
+# ==========================================
 # DATA LOADING & PARSING FUNCTION (MASTER)
 # ==========================================
 @st.cache_data
-def load_and_clean_master(file_path):
+def load_and_clean_master(file):
     try:
-        df_raw = pd.read_excel(file_path, header=None)
+        df_raw = pd.read_excel(file, header=None)
         df_content = df_raw.iloc[3:].copy()
         
         cleaned_df = pd.DataFrame({
@@ -62,19 +77,11 @@ def load_and_clean_master(file_path):
         st.error(f"Error membaca database master unit: {e}")
         return pd.DataFrame()
 
-# Load Data Master (MSE600)
-df_master = load_and_clean_master("MSE600 (1).xlsx")
-
-# ==========================================
-# SIDEBAR NAVIGATION
-# ==========================================
-st.sidebar.title("🚜 Jobsite Fleet System")
-st.sidebar.caption("System Monitoring & Mob-Demob Real-Time")
-
-menu = st.sidebar.radio(
-    "Navigasi Menu",
-    ["📊 Dashboard Overview", "🔍 Master Data Unit", "🚚 Form Mob / Demob", "📜 Log Transaksi Permanen"]
-)
+# Cek apakah file sudah di-upload via web
+if uploaded_file is not None:
+    df_master = load_and_clean_master(uploaded_file)
+else:
+    df_master = pd.DataFrame()
 
 # ==========================================
 # MENU 1: DASHBOARD OVERVIEW
@@ -83,7 +90,9 @@ if menu == "📊 Dashboard Overview":
     st.title("📊 Dashboard Fleet & Operational Overview")
     st.markdown("---")
 
-    if not df_master.empty:
+    if df_master.empty:
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu melalui menu *Upload Data Master* di sidebar sebelah kiri.")
+    else:
         total_unit = len(df_master)
         available_unit = len(df_master[df_master['Status_Code'] == 'AV'])
         off_hire_unit = len(df_master[df_master['Status_Code'] == 'OH'])
@@ -119,7 +128,9 @@ if menu == "📊 Dashboard Overview":
 elif menu == "🔍 Master Data Unit":
     st.title("🔍 Master Data Equipment Ellipse")
     
-    if not df_master.empty:
+    if df_master.empty:
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu melalui menu di sidebar kiri.")
+    else:
         f_col1, f_col2 = st.columns(2)
         with f_col1:
             status_filter = st.multiselect("Filter Status Unit:", options=df_master['Status_Description'].unique(), default=df_master['Status_Description'].unique())
@@ -145,7 +156,9 @@ elif menu == "🚚 Form Mob / Demob":
 
     conn = get_gsheets_connection()
 
-    if not df_master.empty:
+    if df_master.empty:
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu di sidebar agar daftar unit muncul pada form.")
+    else:
         with st.form("form_mob_demob", clear_on_submit=True):
             col_a, col_b = st.columns(2)
 
