@@ -35,6 +35,36 @@ st.markdown(
     .jf-kicker { color:#69e4ff; font-size:12px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
     .jf-title { font-size:clamp(24px,3vw,38px); font-weight:850; margin:5px 0; color:#f4fbff; }
     .jf-subtitle { color:#a9c7df; font-size:14px; }
+
+    /* Premium navigation / enterprise sidebar */
+    [data-testid="stSidebar"] > div:first-child { padding-top: 1.25rem; }
+    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: .65rem; }
+    [data-testid="stSidebar"] .stRadio > label { color:#7ddfff !important; font-size:11px !important; font-weight:800 !important; letter-spacing:1.7px !important; text-transform:uppercase; margin: 12px 0 8px; }
+    [data-testid="stSidebar"] div[role="radiogroup"] { gap:7px; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label {
+        display:flex; align-items:center; min-height:42px; padding:10px 12px !important;
+        border:1px solid rgba(110,180,220,.12); border-radius:12px;
+        background:linear-gradient(110deg,rgba(13,34,56,.72),rgba(8,22,39,.52));
+        transition:all .18s ease; margin:0 !important;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+        border-color:rgba(67,217,255,.55); background:rgba(20,59,87,.8); transform:translateX(2px);
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
+        border-color:rgba(67,217,255,.75); background:linear-gradient(100deg,rgba(10,120,201,.34),rgba(49,91,255,.19));
+        box-shadow:inset 3px 0 0 #43d9ff, 0 5px 18px rgba(0,0,0,.12);
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size:13px; font-weight:650; color:#dceeff; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display:none; }
+    .jf-brand-card { padding:18px 15px; margin:4px 0 14px; border:1px solid rgba(67,217,255,.28); border-radius:16px; background:linear-gradient(145deg,rgba(17,57,86,.92),rgba(7,19,35,.96)); box-shadow:0 10px 28px rgba(0,0,0,.2); }
+    .jf-brand-mark { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#43d9ff,#397bff); color:#031323; font-weight:950; margin-bottom:10px; box-shadow:0 0 20px rgba(67,217,255,.2); }
+    .jf-brand-name { font-size:19px; line-height:1.08; font-weight:900; letter-spacing:.4px; color:#f4fbff; }
+    .jf-brand-caption { color:#8bb6d5; font-size:10px; letter-spacing:1.5px; margin-top:8px; text-transform:uppercase; }
+    .jf-user-chip { border:1px solid rgba(67,217,255,.2); background:rgba(8,24,42,.7); padding:10px 12px; border-radius:12px; color:#b9d8ee; font-size:12px; }
+    .jf-section-label { color:#69e4ff; font-size:10px; letter-spacing:1.8px; font-weight:850; text-transform:uppercase; margin:12px 0 6px; }
+    .jf-hero { position:relative; overflow:hidden; }
+    .jf-hero:after { content:""; position:absolute; width:210px; height:210px; right:-75px; top:-95px; border:1px solid rgba(67,217,255,.22); border-radius:50%; box-shadow:0 0 0 22px rgba(67,217,255,.035),0 0 0 48px rgba(67,217,255,.025); pointer-events:none; }
+    @media (max-width: 768px) { .jf-brand-name { font-size:17px; } .jf-hero { padding:18px; } }
     </style>
     """,
     unsafe_allow_html=True,
@@ -337,11 +367,11 @@ except Exception as exc:
 # =========================================================
 if st.session_state.company_logo_bytes:
     st.sidebar.image(st.session_state.company_logo_bytes, use_container_width=True)
-st.sidebar.markdown("<div class='jf-kicker'>Operations Control</div><div style='font-size:22px;font-weight:850;line-height:1.2'>JOBSITE FLEET<br>SYSTEM</div><div style='color:#8bb6d5;font-size:12px;margin-top:6px'>MOB / DEMOB MANAGEMENT</div>", unsafe_allow_html=True)
-st.sidebar.info(f"Operator: {st.session_state.username}")
+st.sidebar.markdown("<div class='jf-brand-card'><div class='jf-brand-mark'>JF</div><div class='jf-brand-name'>JOBSITE FLEET<br>SYSTEM</div><div class='jf-brand-caption'>Operations Control Platform</div></div>", unsafe_allow_html=True)
+st.sidebar.markdown(f"<div class='jf-user-chip'>● &nbsp; Signed in as <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
 
 menu = st.sidebar.radio(
-    "Navigasi Menu",
+    "Workspace Navigation",
     [
         "Dashboard Overview",
         "Master Jobsite",
@@ -354,13 +384,13 @@ menu = st.sidebar.radio(
     ],
 )
 
-st.sidebar.markdown("---")
+st.sidebar.markdown("<div class='jf-section-label'>System Actions</div>", unsafe_allow_html=True)
 
-if st.sidebar.button("Refresh Data Real-Time"):
+if st.sidebar.button("↻  Refresh Data Real-Time"):
     st.cache_data.clear()
     st.rerun()
 
-if st.sidebar.button("Logout"):
+if st.sidebar.button("⇥  Logout"):
     st.session_state.logged_in = False
     st.session_state.username = ""
     st.rerun()
