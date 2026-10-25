@@ -1,6 +1,7 @@
 streamlit
-  pandas
-  openpyxl
-  plotly
-  st-gsheets-connection
-  requests
+pandas
+plotly
+requests
+streamlit-gsheets
+openpyxl
+xlrd
