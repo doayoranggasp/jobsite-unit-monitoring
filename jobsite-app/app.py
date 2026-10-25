@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import requests
 from datetime import datetime
 from streamlit_gsheets import GSheetsConnection
 
@@ -14,7 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS Tampilan Modern & Clean
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -29,7 +29,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# KONEKSI GOOGLE SHEETS (PERMANENT DB)
+# KONEKSI GOOGLE SHEETS
 # ==========================================
 def get_gsheets_connection():
     try:
@@ -54,7 +54,7 @@ menu = st.sidebar.radio(
 )
 
 # ==========================================
-# DATA LOADING & PARSING FUNCTION (MASTER)
+# DATA LOADING FUNCTION
 # ==========================================
 @st.cache_data
 def load_and_clean_master(file):
@@ -77,7 +77,6 @@ def load_and_clean_master(file):
         st.error(f"Error membaca database master unit: {e}")
         return pd.DataFrame()
 
-# Cek apakah file sudah di-upload via web
 if uploaded_file is not None:
     df_master = load_and_clean_master(uploaded_file)
 else:
@@ -91,7 +90,7 @@ if menu == "📊 Dashboard Overview":
     st.markdown("---")
 
     if df_master.empty:
-        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu melalui menu *Upload Data Master* di sidebar sebelah kiri.")
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu melalui sidebar.")
     else:
         total_unit = len(df_master)
         available_unit = len(df_master[df_master['Status_Code'] == 'AV'])
@@ -129,7 +128,7 @@ elif menu == "🔍 Master Data Unit":
     st.title("🔍 Master Data Equipment Ellipse")
     
     if df_master.empty:
-        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu melalui menu di sidebar kiri.")
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu di sidebar.")
     else:
         f_col1, f_col2 = st.columns(2)
         with f_col1:
@@ -152,12 +151,10 @@ elif menu == "🔍 Master Data Unit":
 # ==========================================
 elif menu == "🚚 Form Mob / Demob":
     st.title("🚚 Input Mobilisasi & Demobilisasi (Simpan Permanen)")
-    st.markdown("Setiap data yang di-submit akan langsung tersimpan otomatis di Google Sheets.")
-
-    conn = get_gsheets_connection()
+    st.markdown("Setiap data yang di-submit akan langsung tersimpan otomatis via Apps Script Web App.")
 
     if df_master.empty:
-        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu di sidebar agar daftar unit muncul pada form.")
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu di sidebar.")
     else:
         with st.form("form_mob_demob", clear_on_submit=True):
             col_a, col_b = st.columns(2)
@@ -179,7 +176,7 @@ elif menu == "🚚 Form Mob / Demob":
                 eq_no = unit_selected.split(" - ")[0]
                 eq_name = unit_selected.split(" - ")[1]
                 
-                new_row = pd.DataFrame([{
+                payload = {
                     'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     'Tanggal_Transaksi': tanggal.strftime("%Y-%m-%d"),
                     'Equipment_No': eq_no,
@@ -189,18 +186,17 @@ elif menu == "🚚 Form Mob / Demob":
                     'Lokasi_Tujuan': lokasi_tujuan,
                     'Keterangan': keterangan,
                     'PIC': pic
-                }])
+                }
 
-                if conn:
-                    try:
-                        existing_data = conn.read(ttl=0)
-                        updated_df = pd.concat([existing_data, new_row], ignore_index=True)
-                        conn.update(data=updated_df)
-                        st.success(f"✅ Berhasil! Transaksi {jenis_aksi} unit {eq_no} telah tersimpan permanen di Cloud Database.")
-                    except Exception as err:
-                        st.error(f"Gagal menyimpan ke Google Sheets: {err}")
-                else:
-                    st.warning("Koneksi Google Sheets belum dikonfigurasi pada Streamlit Secrets.")
+                try:
+                    webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
+                    response = requests.post(webapp_url, json=payload)
+                    if response.status_code == 200:
+                        st.success(f"✅ Berhasil! Transaksi {jenis_aksi} unit {eq_no} telah tersimpan permanen di Google Sheets.")
+                    else:
+                        st.error(f"Gagal mengirim data ke Web App. Status code: {response.status_code}")
+                except Exception as err:
+                    st.error(f"Terjadi kesalahan koneksi: {err}")
 
 # ==========================================
 # MENU 4: LOG TRANSAKSI PERMANEN
@@ -217,4 +213,4 @@ elif menu == "📜 Log Transaksi Permanen":
             csv = db_data.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Export Log Database (CSV)", csv, "log_database_mob_demob.csv", "text/csv")
         except Exception as e:
-            st.info("Belum ada data transaksi atau Google Sheets masih kosong/sedang disiapkan.")
+            st.info("Belum ada data transaksi atau Google Sheets masih kosong.")
