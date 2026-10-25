@@ -270,7 +270,7 @@ def load_master_from_cloud():
     equipment_idx = find_col(["equipment no", "equip no", "equipment", "unit no"], 0)
     name_idx = find_col(["equipment name", "unit name", "description"], 2 if ncols > 2 else 1)
     status_idx = find_col(["status code", "status"], 3)
-    status_desc_idx = find_col(["status description", "status desc"], 4)
+    status_desc_idx = find_col(["equipment status description", "status description", "status desc"], 4)
     location_idx = find_col(["project location", "location", "project"], 8 if ncols > 8 else 5)
     serial_idx = find_col(["serial number", "serial no", "serial"], 11 if ncols > 11 else 6)
 
@@ -346,7 +346,7 @@ if st.sidebar.button("Logout"):
 # =========================================================
 if menu == "Dashboard Overview":
     st.title("Dashboard Fleet & Operational Overview")
-    st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Status_Description.")
+    st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Equipment Status Description.")
 
     if df_master.empty:
         st.warning("Data Master MSE600 belum tersedia atau gagal dibaca. Periksa tab MSE600 dan konfigurasi Google Sheets.")
@@ -568,7 +568,7 @@ elif menu == "Upload / Update Master MSE600":
 # =========================================================
 elif menu == "Form Mob / Demob":
     st.title("Form Mobilisasi & Demobilisasi")
-    st.info("Saat transaksi berhasil, sistem mencatat log dan memperbarui Status_Description serta Project_Location pada Master MSE600.")
+    st.info("Saat transaksi berhasil, sistem mencatat log dan memperbarui Equipment Status Description serta Project_Location pada Master MSE600.")
 
     if df_master.empty:
         st.warning("Data Master MSE600 belum tersedia. Upload file master terlebih dahulu.")
@@ -646,7 +646,7 @@ elif menu == "Form Mob / Demob":
                             if api_success(result):
                                 st.success(result.get("message", "Transaksi tersimpan dan master unit diperbarui."))
                                 if result.get("master_updated"):
-                                    st.success(f"Master MSE600 diperbarui: Status_Description = {result.get('new_status_description', aksi)}; Project_Location = {tujuan}.")
+                                    st.success(f"Master MSE600 diperbarui: Equipment Status Description = {result.get('new_status_description', aksi)}; Project_Location = {tujuan}.")
                                 else:
                                     st.warning("Log tersimpan, tetapi backend tidak mengonfirmasi pembaruan master. Periksa tab MSE600.")
                                 st.cache_data.clear()
