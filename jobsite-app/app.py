@@ -25,7 +25,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Session State
+# Session State Inisialisasi
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -82,7 +82,13 @@ if not st.session_state.logged_in:
                 else:
                     try:
                         webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
-                        res = requests.post(webapp_url, json={"action": "register", "username": r_user, "password": str(r_pass), "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+                        payload = {
+                            "action": "register",
+                            "username": r_user,
+                            "password": str(r_pass),
+                            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                        res = requests.post(webapp_url, json=payload)
                         res_json = res.json()
                         if res_json.get("result") == "success":
                             st.success("Pendaftaran berhasil! Silakan pindah ke tab Login.")
@@ -93,7 +99,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# PARSER CERDAS (AUTO-MAPPING DATA MASTER)
+# PARSER DATA MASTER YANG AMAN & BERSIH
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
@@ -105,40 +111,52 @@ def load_master_from_cloud():
         if df_raw.empty:
             return pd.DataFrame()
         
-        # Cari baris header secara otomatis
+        # Deteksi baris header secara aman tanpa nested ternary
         header_idx = 0
         for idx in range(min(10, len(df_raw))):
-            row_str = " ".join(df_raw.iloc[idx].astype(str).values).lower()
-            if "equip" in row_str or "unit" in row_str or "equipment_no" in row_str:
+            row_vals = [str(x).lower() for x in df_raw.iloc[idx].values]
+            joined = " ".join(row_vals)
+            if "equip" in joined or "unit" in joined:
                 header_idx = idx
                 break
         
-        df_cleaned = df_raw.iloc[header_idx + 1:].copy() if header_idx > 0 else df_raw.iloc[1:].copy()
+        df_cleaned = df_raw.iloc[header_idx + 1:].copy() if header_idx < len(df_raw) - 1 else df_raw.copy()
         df_cleaned = df_cleaned.reset_index(drop=True)
-        cols_count = df_cleaned.shape[1]
         
-        if cols_count == 0:
+        if df_cleaned.empty:
             return pd.DataFrame()
+            
+        ncols = df_cleaned.shape[1]
         
-        # Pemetaan kolom dinamis
-        res_df = pd.DataFrame({
-            'Equipment_No': df_cleaned.iloc[:, 0].astype(str).str.strip(),
-            'Equipment_Name': df_cleaned.iloc[:, 2].astype(str).str.strip() if cols_count > 2 else df_cleaned.iloc[:, 1].astype(str).str.strip(),
-            'Status_Code': df_cleaned.iloc[:, 3].astype(str).str.strip() if cols_count > 3 else "AV",
-            'Status_Description': df_cleaned.iloc[:, 4].astype(str).str.strip() if cols_count > 4 else "Available",
-            'Project_Location': df_cleaned.iloc[:, 8].astype(str).str.strip() if cols_count > 8 else (df_cleaned.iloc[:, 5].astype(str).str.strip() if cols_count > 5 else ""),
-            'Serial_Number_Info': df_cleaned.iloc[:, 11].astype(str).str.strip() if cols_count > 11 else (df_cleaned.iloc[:, 6].astype(str).str.strip() if cols_count > 6 else "")
+        def get_column(idx, default_val=""):
+            if ncols > idx:
+                return df_cleaned.iloc[:, idx].astype(str).str.strip()
+            return pd.Series([default_val] * len(df_cleaned))
+            
+        eq_no = get_column(0)
+        eq_name = get_column(2) if ncols > 2 else get_column(1)
+        stat_code = get_column(3, "AV")
+        stat_desc = get_column(4, "Available")
+        proj_loc = get_column(8) if ncols > 8 else get_column(5)
+        serial_info = get_column(11) if ncols > 11 else get_column(6)
+        
+        result_df = pd.DataFrame({
+            'Equipment_No': eq_no,
+            'Equipment_Name': eq_name,
+            'Status_Code': stat_code,
+            'Status_Description': stat_desc,
+            'Project_Location': proj_loc,
+            'Serial_Number_Info': serial_info
         })
         
-        # Filter baris valid
-        res_df = res_df[
-            (res_df['Equipment_No'] != '') & 
-            (res_df['Equipment_No'].str.lower() != 'nan') & 
-            (res_df['Equipment_No'].str.lower() != 'none') &
-            (~res_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
+        result_df = result_df[
+            (result_df['Equipment_No'] != '') & 
+            (result_df['Equipment_No'].str.lower() != 'nan') & 
+            (result_df['Equipment_No'].str.lower() != 'none') &
+            (~result_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
         ]
-        return res_df
-    except Exception:
+        return result_df
+    except Exception as e:
         return pd.DataFrame()
 
 df_master = load_master_from_cloud()
@@ -178,7 +196,7 @@ if menu == "Dashboard Overview":
     st.markdown("---")
 
     if df_master.empty:
-        st.warning("Belum ada Data Master MSE600 di Google Sheets. Silakan upload file Excel master Anda melalui menu **Upload / Update Master MSE600**.")
+        st.warning("Belum ada Data Master MSE600 di Google Sheets. Silakan upload file Excel master Anda melalui menu Upload / Update Master MSE600 di sidebar.")
     else:
         total_unit = len(df_master)
         available_unit = len(df_master[df_master['Status_Code'] == 'AV'])
@@ -223,7 +241,7 @@ elif menu == "Master Data Unit":
         st.dataframe(filtered, use_container_width=True, height=450)
 
 # ------------------------------------------
-# 3. UPLOAD MASTER MSE600
+# 3. UPLOAD / UPDATE MASTER MSE600
 # ------------------------------------------
 elif menu == "Upload / Update Master MSE600":
     st.title("Upload & Perbarui Master Data MSE600")
@@ -248,7 +266,7 @@ elif menu == "Upload / Update Master MSE600":
                 st.error(f"Error: {e}")
                 
     st.markdown("---")
-    if st.checkbox("🔍 Debug Lihat Data Mentah di Cloud"):
+    if st.checkbox("Debug Lihat Data Mentah di Cloud"):
         conn = get_gsheets_connection()
         if conn:
             try:
