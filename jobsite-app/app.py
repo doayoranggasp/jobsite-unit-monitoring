@@ -469,7 +469,7 @@ if st.sidebar.button("⇥  Logout"):
 # =========================================================
 # 1. DASHBOARD OVERVIEW
 # =========================================================
-st.markdown("<div class='jf-hero'><div class='jf-kicker'>KPP INDE</div><div class='jf-title'>MONITORING UNIT KPP INDE</div><div class='jf-subtitle'>Monitor unit movement, jobsite readiness, and DEMOB closure from one operational workspace.</div></div>", unsafe_allow_html=True)
+st.markdown("<div class='jf-hero'><div class='jf-kicker'>KPP INDE</div><div class='jf-title'>MONITORING UNIT KPP INDE</div><div class='jf-subtitle'></div></div>", unsafe_allow_html=True)
 if menu == "Dashboard Overview":
     st.title("Dashboard Unit KPP INDE")
     st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Equipment Status Description.")
