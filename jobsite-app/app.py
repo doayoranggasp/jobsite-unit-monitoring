@@ -244,7 +244,7 @@ def clean_text_series(series):
 # LOGIN / REGISTER
 # =========================================================
 if not st.session_state.logged_in:
-    st.title("Login & Register - Jobsite Fleet System")
+    st.title("Login & Register - KPP INDE")
     st.markdown("Silakan masuk menggunakan akun terdaftar atau buat akun baru.")
 
     tab_login, tab_reg = st.tabs(["Login", "Register Akun Baru"])
