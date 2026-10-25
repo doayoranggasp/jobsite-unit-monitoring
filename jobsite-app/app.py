@@ -105,7 +105,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# APLIKASI UTAMA (SETELAH LOGIN BERHASIL)
+# APLIKASI UTAMA (AUTO-DETECT MASTER PARSER)
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
@@ -113,22 +113,34 @@ def load_master_from_cloud():
     if conn:
         try:
             df_raw = conn.read(worksheet="MSE600", ttl=0, header=None)
-            if df_raw.empty or len(df_raw) < 4:
+            if df_raw.empty:
                 return pd.DataFrame()
             
-            df_content = df_raw.iloc[3:].copy()
+            # Deteksi otomatis baris awal data berdasarkan isi sel pertama
+            start_row = 3
+            if len(df_raw) > 0:
+                val_col0 = str(df_raw.iloc[0, 0]).lower()
+                if 'equip' in val_col0 or 'unit' in val_col0 or 'no' in val_col0 or len(df_raw) < 4:
+                    start_row = 0  # Jika baris pertama sudah berupa header atau data langsung
+            
+            df_content = df_raw.iloc[start_row:].copy()
+            cols = df_content.shape[1]
+            
             cleaned_df = pd.DataFrame({
-                'Equipment_No': df_content[0].astype(str),
-                'Equipment_Name': df_content[2].astype(str),
-                'Status_Code': df_content[3].astype(str),
-                'Status_Description': df_content[4].astype(str),
-                'Site_Code': df_content[7].astype(str),
-                'Project_Location': df_content[8].astype(str),
-                'Serial_Number_Info': df_content[11].astype(str)
+                'Equipment_No': df_content.iloc[:, 0].astype(str) if cols > 0 else "",
+                'Equipment_Name': df_content.iloc[:, 2].astype(str) if cols > 2 else (df_content.iloc[:, 1].astype(str) if cols > 1 else ""),
+                'Status_Code': df_content.iloc[:, 3].astype(str) if cols > 3 else "",
+                'Status_Description': df_content.iloc[:, 4].astype(str) if cols > 4 else "",
+                'Site_Code': df_content.iloc[:, 7].astype(str) if cols > 7 else "",
+                'Project_Location': df_content.iloc[:, 8].astype(str) if cols > 8 else (df_content.iloc[:, 5].astype(str) if cols > 5 else ""),
+                'Serial_Number_Info': df_content.iloc[:, 11].astype(str) if cols > 11 else (df_content.iloc[:, 6].astype(str) if cols > 6 else "")
             })
+            
+            # Bersihkan baris kosong atau baris header tiruan
+            cleaned_df = cleaned_df[~cleaned_df['Equipment_No'].isin(['nan', '', 'Equipment_No', 'Equipment No', 'Equip No', 'Equipment', 'None'])]
             cleaned_df.dropna(subset=['Equipment_No'], inplace=True)
             return cleaned_df
-        except:
+        except Exception as e:
             return pd.DataFrame()
     return pd.DataFrame()
 
