@@ -274,7 +274,7 @@ def clean_text_series(series):
 # LOGIN / REGISTER
 # =========================================================
 if not st.session_state.logged_in:
-    st.title("Login & Register - Jobsite Fleet System")
+    st.title("Login & Register - KPP INDE")
     st.markdown("Silakan masuk menggunakan akun terdaftar atau buat akun baru.")
 
     tab_login, tab_reg = st.tabs(["Login", "Register Akun Baru"])
@@ -437,7 +437,7 @@ except Exception as exc:
 # =========================================================
 if st.session_state.company_logo_bytes:
     st.sidebar.image(st.session_state.company_logo_bytes, use_container_width=True)
-st.sidebar.markdown("<div class='jf-brand-card'><div class='jf-brand-mark'>KPP</div><div class='jf-brand-name'>JOBSITE FLEET<br>SYSTEM</div><div class='jf-brand-caption'>Operations Control Platform</div></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div class='jf-brand-card'><div class='jf-brand-mark'>KPP</div><div class='jf-brand-name'>KPP INDE<br>@2026</div><div class='jf-brand-caption'>MONITORING UNIT KPP</div></div>", unsafe_allow_html=True)
 st.sidebar.markdown(f"<div class='jf-user-chip'>● &nbsp; Signed in as <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
 
 menu = st.sidebar.radio(
@@ -469,9 +469,9 @@ if st.sidebar.button("⇥  Logout"):
 # =========================================================
 # 1. DASHBOARD OVERVIEW
 # =========================================================
-st.markdown("<div class='jf-hero'><div class='jf-kicker'>Fleet intelligence platform</div><div class='jf-title'>Jobsite Fleet Management</div><div class='jf-subtitle'>Monitor unit movement, jobsite readiness, and DEMOB closure from one operational workspace.</div></div>", unsafe_allow_html=True)
+st.markdown("<div class='jf-hero'><div class='jf-kicker'>KPP INDE</div><div class='jf-title'>MONITORING UNIT KPP INDE</div><div class='jf-subtitle'>Monitor unit movement, jobsite readiness, and DEMOB closure from one operational workspace.</div></div>", unsafe_allow_html=True)
 if menu == "Dashboard Overview":
-    st.title("Dashboard Fleet & Operational Overview")
+    st.title("Dashboard Unit KPP INDE")
     st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Equipment Status Description.")
 
     # DEMOB OPEN/CLOSE monitoring from permanent Log_Trans sheet.
