@@ -73,9 +73,9 @@ if not st.session_state.logged_in:
                                 else:
                                     st.error("Username atau Password salah!")
                             else:
-                                st.error("Belum ada data user di Google Sheets. Silakan Register terlebih dahulu.")
+                                st.error("Belum ada data user di Google Sheets. Silakan daftarkan akun baru via tab Register.")
                         except Exception as e:
-                            st.error(f"Gagal memverifikasi user: {e}")
+                            st.error("Tab 'Users' belum tersedia di Google Sheets. Silakan daftarkan akun pertama Anda melalui tab 'Register Akun Baru' di sebelah kanan agar tab otomatis dibuat.")
                     else:
                         st.error("Koneksi Google Sheets belum dikonfigurasi pada Streamlit Secrets.")
 
@@ -100,7 +100,7 @@ if not st.session_state.logged_in:
                         res = requests.post(webapp_url, json=payload)
                         res_json = res.json()
                         if res_json.get("result") == "success":
-                            st.success("✅ Pendaftaran berhasil! Silakan pindah ke tab Login.")
+                            st.success("✅ Pendaftaran berhasil! Tab 'Users' telah otomatis dibuat di Google Sheets. Silakan pindah ke tab Login.")
                         else:
                             st.warning(f"⚠️ {res_json.get('message', 'Gagal mendaftar.')}")
                     except Exception as err:
