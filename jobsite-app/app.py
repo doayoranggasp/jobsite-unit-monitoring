@@ -404,6 +404,62 @@ if menu == "Dashboard Overview":
     st.title("Dashboard Fleet & Operational Overview")
     st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Equipment Status Description.")
 
+    # DEMOB OPEN/CLOSE monitoring from permanent Log_Trans sheet.
+    st.markdown("### Monitoring Proses DEMOB")
+    log_df = pd.DataFrame()
+    log_read_error = None
+    try:
+        log_conn = get_gsheets_connection()
+        if log_conn is not None:
+            log_df = log_conn.read(worksheet=get_worksheet_id("log_trans_gid"), ttl=0)
+            if log_df is None:
+                log_df = pd.DataFrame()
+    except Exception as exc:
+        log_read_error = str(exc)
+        log_df = pd.DataFrame()
+
+    if log_read_error:
+        st.warning(f"Data monitoring DEMOB belum dapat dibaca dari Log_Trans: {log_read_error}")
+    elif log_df.empty:
+        st.info("Belum ada transaksi untuk monitoring DEMOB.")
+    else:
+        # Be tolerant of historical rows where the new status columns did not exist.
+        for col in ["Jenis_Aksi", "Process_Status", "Manifest_Number", "Closed_Timestamp", "Closed_By", "Tanggal_Transaksi", "Equipment_No", "Nama_Unit", "Lokasi_Asal", "Lokasi_Tujuan", "PIC", "Request_ID"]:
+            if col not in log_df.columns:
+                log_df[col] = ""
+        demob_df = log_df[log_df["Jenis_Aksi"].fillna("").astype(str).str.strip().str.upper().str.contains("DEMOB", na=False)].copy()
+        demob_df["Process_Status"] = demob_df["Process_Status"].fillna("").astype(str).str.strip().str.upper()
+        demob_df.loc[demob_df["Process_Status"] == "", "Process_Status"] = "OPEN"
+        demob_df["Manifest_Number"] = demob_df["Manifest_Number"].fillna("").astype(str).str.strip()
+        demob_df.loc[demob_df["Process_Status"].isin(["CLOSED", "COMPLETE", "COMPLETED"]), "Process_Status"] = "CLOSE"
+        open_df = demob_df[demob_df["Process_Status"] == "OPEN"]
+        close_df = demob_df[demob_df["Process_Status"] == "CLOSE"]
+        other_df = demob_df[~demob_df["Process_Status"].isin(["OPEN", "CLOSE"])]
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total DEMOB", f"{len(demob_df):,}")
+        m2.metric("OPEN", f"{len(open_df):,}")
+        m3.metric("CLOSE", f"{len(close_df):,}")
+        m4.metric("OPEN tanpa Manifest", f"{int((open_df['Manifest_Number'] == '').sum()):,}")
+
+        f_status, f_search = st.columns([1, 2])
+        with f_status:
+            demob_status_filter = st.multiselect("Filter Status Proses", ["OPEN", "CLOSE"], default=["OPEN", "CLOSE"], key="dashboard_demob_status")
+        with f_search:
+            demob_search = st.text_input("Cari DEMOB (unit / manifest / PIC / request ID)", key="dashboard_demob_search")
+        shown_demob = demob_df[demob_df["Process_Status"].isin(demob_status_filter)].copy() if demob_status_filter else demob_df.iloc[0:0].copy()
+        if demob_search.strip():
+            term = demob_search.strip()
+            search_cols = ["Equipment_No", "Nama_Unit", "Manifest_Number", "PIC", "Request_ID", "Lokasi_Asal", "Lokasi_Tujuan"]
+            mask = pd.Series(False, index=shown_demob.index)
+            for col in search_cols:
+                mask |= shown_demob[col].fillna("").astype(str).str.contains(term, case=False, regex=False, na=False)
+            shown_demob = shown_demob[mask]
+        display_cols = ["Tanggal_Transaksi", "Equipment_No", "Nama_Unit", "Lokasi_Asal", "Lokasi_Tujuan", "PIC", "Process_Status", "Manifest_Number", "Closed_Timestamp", "Closed_By", "Request_ID"]
+        st.dataframe(shown_demob[display_cols], use_container_width=True, hide_index=True)
+        if not other_df.empty:
+            st.caption(f"Catatan: {len(other_df)} baris DEMOB memiliki status selain OPEN/CLOSE dan tidak masuk hitungan utama.")
+        st.markdown("---")
+
     if df_master.empty:
         st.warning("Data Master MSE600 belum tersedia atau gagal dibaca. Periksa tab MSE600 dan konfigurasi Google Sheets.")
     else:
@@ -809,13 +865,16 @@ elif menu == "Tutup Proses DEMOB":
                     options = open_demobs.to_dict("records")
                     labels = [f"{r.get('Equipment_No','')} | {r.get('Tanggal_Transaksi','')} | {r.get('Lokasi_Asal','')} → {r.get('Lokasi_Tujuan','')}" for r in options]
                     selected = st.selectbox("Pilih proses DEMOB yang selesai diverifikasi", range(len(options)), format_func=lambda i: labels[i])
-                    confirm = st.checkbox("Saya sudah memverifikasi proses DEMOB dan menyetujui penutupan.")
-                    if st.button("Tutup Proses DEMOB", type="primary", disabled=not confirm):
+                    manifest_number = st.text_input("Nomor Manifest *", placeholder="Masukkan nomor manifest yang valid", help="Nomor manifest wajib diisi sebelum proses DEMOB dapat ditutup.").strip()
+                    confirm = st.checkbox("Saya sudah memverifikasi proses DEMOB, nomor manifest, dan menyetujui penutupan.")
+                    if st.button("Tutup Proses DEMOB", type="primary", disabled=(not confirm or not manifest_number)):
                         req_id = str(options[selected].get("Request_ID", "")).strip()
                         if not req_id:
                             st.error("Request_ID kosong; proses tidak dapat ditutup dengan aman.")
+                        elif not manifest_number:
+                            st.error("Nomor Manifest wajib diisi sebelum status diubah menjadi CLOSE.")
                         else:
-                            response = post_to_webapp({"action":"close_demob","Request_ID":req_id,"Closed_By":st.session_state.username})
+                            response = post_to_webapp({"action":"close_demob","Request_ID":req_id,"Closed_By":st.session_state.username,"Manifest_Number":manifest_number})
                             if api_success(response):
                                 st.success(response.get("message", "Proses ditutup."))
                                 st.cache_data.clear()
