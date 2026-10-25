@@ -190,6 +190,46 @@ def get_worksheet_id(key):
         ) from exc
 
 
+def normalize_log_columns(frame):
+    """Normalize Log_Trans headers so minor spacing/case/underscore differences do not break monitoring."""
+    if frame is None:
+        return pd.DataFrame()
+    frame = frame.copy()
+    def key(value):
+        return " ".join(str(value).replace("\ufeff", "").strip().lower().replace("_", " ").replace("-", " ").split())
+    aliases = {
+        "Timestamp": ["timestamp", "time stamp", "waktu input"],
+        "Tanggal_Transaksi": ["tanggal transaksi", "tanggal", "transaction date"],
+        "Equipment_No": ["equipment no", "equipment number", "equipment", "nomor unit", "no unit"],
+        "Nama_Unit": ["nama unit", "unit name"],
+        "Jenis_Aksi": ["jenis aksi", "jenis transaksi", "action type", "aksi", "jenis action"],
+        "Lokasi_Asal": ["lokasi asal", "asal", "origin", "from location"],
+        "Lokasi_Tujuan": ["lokasi tujuan", "tujuan", "destination", "to location"],
+        "Keterangan": ["keterangan", "remarks", "notes"],
+        "PIC": ["pic", "person in charge", "operator"],
+        "Request_ID": ["request id", "requestid", "id request", "transaction id"],
+        "Process_Status": ["process status", "status proses", "status transaksi", "status"],
+        "Closed_Timestamp": ["closed timestamp", "waktu close", "tanggal close", "closed at"],
+        "Closed_By": ["closed by", "ditutup oleh", "username penutup"],
+        "Manifest_Number": ["manifest number", "nomor manifest", "no manifest", "manifest no", "manifest"],
+    }
+    reverse = {key(alias): canonical for canonical, names in aliases.items() for alias in names}
+    rename = {}
+    for col in frame.columns:
+        normalized = key(col)
+        if normalized in reverse:
+            rename[col] = reverse[normalized]
+    frame = frame.rename(columns=rename)
+    # If duplicate headers map to the same canonical field, keep the first non-empty value.
+    if frame.columns.duplicated().any():
+        result = pd.DataFrame(index=frame.index)
+        for col in dict.fromkeys(frame.columns):
+            same = frame.loc[:, frame.columns == col]
+            result[col] = same.bfill(axis=1).iloc[:, 0] if same.shape[1] > 1 else same.iloc[:, 0]
+        frame = result
+    return frame
+
+
 def clean_text_series(series):
     """Konversi kolom menjadi teks tanpa nilai NaN/None."""
     return (
@@ -412,6 +452,7 @@ if menu == "Dashboard Overview":
         log_conn = get_gsheets_connection()
         if log_conn is not None:
             log_df = log_conn.read(worksheet=get_worksheet_id("log_trans_gid"), ttl=0)
+            log_df = normalize_log_columns(log_df)
             if log_df is None:
                 log_df = pd.DataFrame()
     except Exception as exc:
@@ -844,11 +885,17 @@ elif menu == "Tutup Proses DEMOB":
     else:
         try:
             logs = conn.read(worksheet=get_worksheet_id("log_trans_gid"), ttl=0)
+            logs = normalize_log_columns(logs)
             if logs is None or logs.empty:
                 st.info("Belum ada transaksi.")
             else:
-                if "Process_Status" not in logs.columns:
-                    logs["Process_Status"] = "OPEN"
+                # Create missing optional fields safely; fail clearly only if action type is truly absent.
+                for optional_col in ["Process_Status", "Manifest_Number", "Closed_Timestamp", "Closed_By", "Request_ID", "Tanggal_Transaksi", "Equipment_No", "Nama_Unit", "Lokasi_Asal", "Lokasi_Tujuan", "PIC"]:
+                    if optional_col not in logs.columns:
+                        logs[optional_col] = ""
+                if "Jenis_Aksi" not in logs.columns:
+                    st.error("Kolom jenis transaksi tidak dikenali. Header yang terbaca: " + ", ".join(map(str, logs.columns)))
+                    st.stop()
                 logs["Process_Status"] = logs["Process_Status"].fillna("").astype(str).str.strip().str.upper()
                 demobs = logs[logs["Jenis_Aksi"].astype(str).str.contains("DEMOB", case=False, na=False)].copy()
                 demobs.loc[demobs["Process_Status"] == "", "Process_Status"] = "OPEN"
