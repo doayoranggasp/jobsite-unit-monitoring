@@ -105,7 +105,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# APLIKASI UTAMA (CLEAN & SAFE PARSER)
+# APLIKASI UTAMA (FLEXIBLE MASTER PARSER)
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
@@ -117,31 +117,29 @@ def load_master_from_cloud():
         if df_raw.empty or len(df_raw) < 1:
             return pd.DataFrame()
         
-        start_row = 3 if len(df_raw) > 3 else 0
-        df_content = df_raw.iloc[start_row:].copy().reset_index(drop=True)
+        df_content = df_raw.copy().reset_index(drop=True)
         cols_count = df_content.shape[1]
         
-        def get_col(idx, default=""):
-            if cols_count > idx:
-                return df_content.iloc[:, idx].astype(str).str.strip()
-            return pd.Series([default] * len(df_content))
+        if cols_count == 0:
+            return pd.DataFrame()
         
+        # Pemetaan kolom secara fleksibel
         cleaned_df = pd.DataFrame({
-            'Equipment_No': get_col(0),
-            'Equipment_Name': get_col(2) if cols_count > 2 else get_col(1),
-            'Status_Code': get_col(3, "AV"),
-            'Status_Description': get_col(4, "Available"),
-            'Site_Code': get_col(7),
-            'Project_Location': get_col(8) if cols_count > 8 else get_col(5),
-            'Serial_Number_Info': get_col(11) if cols_count > 11 else get_col(6)
+            'Equipment_No': df_content.iloc[:, 0].astype(str).str.strip(),
+            'Equipment_Name': df_content.iloc[:, 2].astype(str).str.strip() if cols_count > 2 else df_content.iloc[:, 1].astype(str).str.strip(),
+            'Status_Code': df_content.iloc[:, 3].astype(str).str.strip() if cols_count > 3 else "AV",
+            'Status_Description': df_content.iloc[:, 4].astype(str).str.strip() if cols_count > 4 else "Available",
+            'Site_Code': df_content.iloc[:, 7].astype(str).str.strip() if cols_count > 7 else "",
+            'Project_Location': df_content.iloc[:, 8].astype(str).str.strip() if cols_count > 8 else (df_content.iloc[:, 5].astype(str).str.strip() if cols_count > 5 else ""),
+            'Serial_Number_Info': df_content.iloc[:, 11].astype(str).str.strip() if cols_count > 11 else (df_content.iloc[:, 6].astype(str).str.strip() if cols_count > 6 else "")
         })
         
+        # Hanya buang baris yang Equipment_No-nya kosong, nan, atau none
         cleaned_df = cleaned_df[
             (cleaned_df['Equipment_No'] != '') & 
             (cleaned_df['Equipment_No'].str.lower() != 'nan') & 
-            (~cleaned_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
+            (cleaned_df['Equipment_No'].str.lower() != 'none')
         ]
-        cleaned_df.dropna(subset=['Equipment_No'], inplace=True)
         return cleaned_df
     except Exception as e:
         return pd.DataFrame()
@@ -265,6 +263,18 @@ elif menu == "Upload / Update Master MSE600":
                     st.error("Gagal menyimpan ke cloud.")
             except Exception as e:
                 st.error(f"Error: {e}")
+
+    # Tambahan Debug View untuk melihat isi tabel MSE600 di Google Sheets
+    st.markdown("---")
+    if st.checkbox("🔍 Tampilkan Debug Data Mentah dari Google Sheets"):
+        conn = get_gsheets_connection()
+        if conn:
+            try:
+                raw_check = conn.read(worksheet="MSE600", ttl=0, header=None)
+                st.write(f"Total Baris di Tab MSE600: {len(raw_check)}")
+                st.dataframe(raw_check.head(10), use_container_width=True)
+            except Exception as e:
+                st.error(f"Gagal membaca tab MSE600: {e}")
 
 # ------------------------------------------
 # MENU 4: FORM MOBILISASI & DEMOBILISASI
