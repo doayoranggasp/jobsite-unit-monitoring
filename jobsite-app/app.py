@@ -41,10 +41,10 @@ def get_gsheets_connection():
 # HALAMAN LOGIN & REGISTER
 # ==========================================
 if not st.session_state.logged_in:
-    st.title("🔐 Login & Register - Jobsite Fleet System")
+    st.title("Login & Register - Jobsite Fleet System")
     st.markdown("Silakan masuk menggunakan akun Anda atau daftarkan akun baru untuk mulai mengakses dashboard.")
     
-    auth_tab1, auth_tab2 = st.tabs(["🔑 Login", "📝 Register Akun Baru"])
+    auth_tab1, auth_tab2 = st.tabs(["Login", "Register Akun Baru"])
     
     with auth_tab1:
         with st.form("login_form"):
@@ -100,9 +100,9 @@ if not st.session_state.logged_in:
                         res = requests.post(webapp_url, json=payload)
                         res_json = res.json()
                         if res_json.get("result") == "success":
-                            st.success("✅ Pendaftaran berhasil! Tab 'Users' telah otomatis dibuat di Google Sheets. Silakan pindah ke tab Login.")
+                            st.success("Pendaftaran berhasil! Tab 'Users' telah otomatis dibuat di Google Sheets. Silakan pindah ke tab Login.")
                         else:
-                            st.warning(f"⚠️ {res_json.get('message', 'Gagal mendaftar.')}")
+                            st.warning(res_json.get('message', 'Gagal mendaftar.'))
                     except Exception as err:
                         st.error(f"Error koneksi: {err}")
     st.stop()
@@ -138,26 +138,26 @@ def load_master_from_cloud():
 df_master = load_master_from_cloud()
 
 # Sidebar Navigation
-st.sidebar.title("🚜 Jobsite Fleet System")
-st.sidebar.info(f"👤 Operator: **{st.session_state.username}**")
+st.sidebar.title("Jobsite Fleet System")
+st.sidebar.info(f"Operator: {st.session_state.username}")
 
 menu = st.sidebar.radio(
     "Navigasi Menu",
     [
-        "📊 Dashboard Overview", 
-        "🔍 Master Data Unit", 
-        "📂 Upload / Update Master MSE600", 
-        "🚚 Form Mob / Demob", 
-        "📜 Log Transaksi Permanen"
+        "Dashboard Overview", 
+        "Master Data Unit", 
+        "Upload / Update Master MSE600", 
+        "Form Mob / Demob", 
+        "Log Transaksi Permanen"
     ]
 )
 
 st.sidebar.markdown("---")
-if st.sidebar.button("🔄 Refresh Data Real-Time"):
+if st.sidebar.button("Refresh Data Real-Time"):
     st.cache_data.clear()
     st.rerun()
 
-if st.sidebar.button("🚪 Logout"):
+if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
     st.session_state.username = ""
     st.rerun()
@@ -165,12 +165,12 @@ if st.sidebar.button("🚪 Logout"):
 # ------------------------------------------
 # MENU 1: DASHBOARD OVERVIEW
 # ------------------------------------------
-if menu == "📊 Dashboard Overview":
-    st.title("📊 Dashboard Fleet & Operational Overview")
+if menu == "Dashboard Overview":
+    st.title("Dashboard Fleet & Operational Overview")
     st.markdown("---")
 
     if df_master.empty:
-        st.warning("⚠️ Belum ada Data Master **MSE600** di Google Sheets. Silakan upload file Excel master Anda melalui menu **Upload / Update Master MSE600** di sidebar.")
+        st.warning("Belum ada Data Master MSE600 di Google Sheets. Silakan upload file Excel master Anda melalui menu Upload / Update Master MSE600 di sidebar.")
     else:
         total_unit = len(df_master)
         available_unit = len(df_master[df_master['Status_Code'] == 'AV'])
@@ -204,11 +204,11 @@ if menu == "📊 Dashboard Overview":
 # ------------------------------------------
 # MENU 2: MASTER DATA UNIT
 # ------------------------------------------
-elif menu == "🔍 Master Data Unit":
-    st.title("🔍 Master Data Equipment Ellipse (Live)")
+elif menu == "Master Data Unit":
+    st.title("Master Data Equipment Ellipse (Live)")
     
     if df_master.empty:
-        st.warning("⚠️ Data Master belum tersedia. Silakan upload file Excel MSE600 melalui menu di sidebar.")
+        st.warning("Data Master belum tersedia. Silakan upload file Excel MSE600 melalui menu di sidebar.")
     else:
         f_col1, f_col2 = st.columns(2)
         with f_col1:
@@ -229,13 +229,13 @@ elif menu == "🔍 Master Data Unit":
 # ------------------------------------------
 # MENU 3: UPLOAD / UPDATE MASTER MSE600
 # ------------------------------------------
-elif menu == "📂 Upload / Update Master MSE600":
-    st.title("📂 Upload & Perbarui Master Data MSE600")
+elif menu == "Upload / Update Master MSE600":
+    st.title("Upload & Perbarui Master Data MSE600")
     st.markdown("Pilih file Excel laporan Ellipse Anda untuk disimpan permanen ke dalam Google Sheets.")
     
     uploaded_file = st.file_uploader("Upload Excel MSE600 (.xlsx)", type=["xlsx", "xls"])
     if uploaded_file is not None:
-        if st.button("💾 Simpan Master ke Cloud Permanen"):
+        if st.button("Simpan Master ke Cloud Permanen"):
             try:
                 df_raw_upload = pd.read_excel(uploaded_file, header=None)
                 rows_data = df_raw_upload.fillna("").values.tolist()
@@ -247,7 +247,7 @@ elif menu == "📂 Upload / Update Master MSE600":
                 webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
                 res = requests.post(webapp_url, json=payload)
                 if res.status_code == 200:
-                    st.success("✅ Master MSE600 berhasil disimpan permanen di Cloud!")
+                    st.success("Master MSE600 berhasil disimpan permanen di Cloud!")
                     st.cache_data.clear()
                     st.rerun()
                 else:
@@ -258,12 +258,12 @@ elif menu == "📂 Upload / Update Master MSE600":
 # ------------------------------------------
 # MENU 4: FORM MOBILISASI & DEMOBILISASI
 # ------------------------------------------
-elif menu == "🚚 Form Mob / Demob":
-    st.title("🚚 Input Mobilisasi & Demobilisasi")
+elif menu == "Form Mob / Demob":
+    st.title("Input Mobilisasi & Demobilisasi")
     st.markdown("Setiap input transaksi akan mencatat log DAN memperbarui lokasi serta status unit di Master Cloud secara otomatis.")
 
     if df_master.empty:
-        st.warning("⚠️ Data Master belum tersedia. Upload file Excel MSE600 terlebih dahulu di menu **Upload / Update Master MSE600**.")
+        st.warning("Data Master belum tersedia. Upload file Excel MSE600 terlebih dahulu di menu Upload / Update Master MSE600.")
     else:
         with st.form("form_mob_demob", clear_on_submit=True):
             col_a, col_b = st.columns(2)
@@ -279,7 +279,7 @@ elif menu == "🚚 Form Mob / Demob":
                 lokasi_tujuan = st.text_input("Lokasi Tujuan (Destination):")
 
             keterangan = st.text_area("Keterangan Catatan / Condition Report:")
-            submit_btn = st.form_submit_button("💾 Simpan Permanen ke Cloud")
+            submit_btn = st.form_submit_button("Simpan Permanen ke Cloud")
 
             if submit_btn:
                 eq_no = unit_selected.split(" - ")[0]
@@ -302,7 +302,7 @@ elif menu == "🚚 Form Mob / Demob":
                     webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
                     response = requests.post(webapp_url, json=payload)
                     if response.status_code == 200:
-                        st.success(f"✅ Berhasil! Transaksi {jenis_aksi} unit {eq_no} tersimpan dan Master Cloud ter-update!")
+                        st.success(f"Berhasil! Transaksi {jenis_aksi} unit {eq_no} tersimpan dan Master Cloud ter-update!")
                         st.cache_data.clear()
                         st.rerun()
                     else:
@@ -313,8 +313,8 @@ elif menu == "🚚 Form Mob / Demob":
 # ------------------------------------------
 # MENU 5: LOG TRANSAKSI PERMANEN
 # ------------------------------------------
-elif menu == "📜 Log Transaksi Permanen":
-    st.title("📜 Log Transaksi Real-Time (Google Sheets)")
+elif menu == "Log Transaksi Permanen":
+    st.title("Log Transaksi Real-Time (Google Sheets)")
     
     conn = get_gsheets_connection()
     if conn:
@@ -323,6 +323,6 @@ elif menu == "📜 Log Transaksi Permanen":
             st.dataframe(db_data, use_container_width=True)
             
             csv = db_data.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Export Log Database (CSV)", csv, "log_database_mob_demob.csv", "text/csv")
+            st.download_button("Export Log Database (CSV)", csv, "log_database_mob_demob.csv", "text/csv")
         except:
             st.info("Belum ada transaksi di tab Log_Trans.")
