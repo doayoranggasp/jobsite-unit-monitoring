@@ -25,7 +25,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi Session State untuk Login
+# Session State Inisialisasi
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -42,7 +42,7 @@ def get_gsheets_connection():
 # ==========================================
 if not st.session_state.logged_in:
     st.title("🔐 Login & Register - Jobsite Fleet System")
-    st.markdown("Silakan masuk atau daftar akun terlebih dahulu untuk mengakses sistem.")
+    st.markdown("Silakan masuk menggunakan akun Anda atau daftarkan akun baru untuk mulai mengakses dashboard.")
     
     auth_tab1, auth_tab2 = st.tabs(["🔑 Login", "📝 Register Akun Baru"])
     
@@ -50,7 +50,7 @@ if not st.session_state.logged_in:
         with st.form("login_form"):
             l_user = st.text_input("Username")
             l_pass = st.text_input("Password", type="password")
-            l_btn = st.form_submit_button("Login ke Sistem")
+            l_btn = st.form_submit_button("Masuk ke Sistem")
             
             if l_btn:
                 if not l_user or not l_pass:
@@ -68,16 +68,16 @@ if not st.session_state.logged_in:
                                 if not user_match.empty:
                                     st.session_state.logged_in = True
                                     st.session_state.username = l_user
-                                    st.success(f"Berhasil login! Selamat datang, {l_user}.")
+                                    st.success(f"Login Berhasil! Selamat datang, {l_user}.")
                                     st.rerun()
                                 else:
                                     st.error("Username atau Password salah!")
                             else:
-                                st.error("Belum ada data user terdaftar di Google Sheets.")
+                                st.error("Belum ada data user di Google Sheets. Silakan Register terlebih dahulu.")
                         except Exception as e:
                             st.error(f"Gagal memverifikasi user: {e}")
                     else:
-                        st.error("Koneksi Google Sheets belum diatur di Secrets.")
+                        st.error("Koneksi Google Sheets belum dikonfigurasi pada Streamlit Secrets.")
 
     with auth_tab2:
         with st.form("register_form"):
@@ -105,10 +105,10 @@ if not st.session_state.logged_in:
                             st.warning(f"⚠️ {res_json.get('message', 'Gagal mendaftar.')}")
                     except Exception as err:
                         st.error(f"Error koneksi: {err}")
-    st.stop() # Hentikan eksekusi ke bawah jika belum login
+    st.stop()
 
 # ==========================================
-# APLIKASI UTAMA (SETELAH LOGIN)
+# APLIKASI UTAMA (SETELAH LOGIN BERHASIL)
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
@@ -139,7 +139,7 @@ df_master = load_master_from_cloud()
 
 # Sidebar Navigation
 st.sidebar.title("🚜 Jobsite Fleet System")
-st.sidebar.info(👤 User: f"**{st.session_state.username}**")
+st.sidebar.info(f"👤 Operator: **{st.session_state.username}**")
 
 menu = st.sidebar.radio(
     "Navigasi Menu",
@@ -163,7 +163,7 @@ if st.sidebar.button("🚪 Logout"):
     st.rerun()
 
 # ------------------------------------------
-# MENU 1: DASHBOARD
+# MENU 1: DASHBOARD OVERVIEW
 # ------------------------------------------
 if menu == "📊 Dashboard Overview":
     st.title("📊 Dashboard Fleet & Operational Overview")
@@ -227,7 +227,7 @@ elif menu == "🔍 Master Data Unit":
         st.dataframe(filtered_df, use_container_width=True, height=450)
 
 # ------------------------------------------
-# MENU 3: UPLOAD MASTER
+# MENU 3: UPLOAD / UPDATE MASTER MSE600
 # ------------------------------------------
 elif menu == "📂 Upload / Update Master MSE600":
     st.title("📂 Upload & Perbarui Master Data MSE600")
@@ -256,11 +256,11 @@ elif menu == "📂 Upload / Update Master MSE600":
                 st.error(f"Error: {e}")
 
 # ------------------------------------------
-# MENU 4: FORM MOB / DEMOB
+# MENU 4: FORM MOBILISASI & DEMOBILISASI
 # ------------------------------------------
 elif menu == "🚚 Form Mob / Demob":
     st.title("🚚 Input Mobilisasi & Demobilisasi")
-    st.markdown("Setiap input akan mencatat log transaksi dan memperbarui status unit di cloud secara otomatis.")
+    st.markdown("Setiap input transaksi akan mencatat log DAN memperbarui lokasi serta status unit di Master Cloud secara otomatis.")
 
     if df_master.empty:
         st.warning("⚠️ Data Master belum tersedia. Upload file Excel MSE600 terlebih dahulu di menu **Upload / Update Master MSE600**.")
@@ -311,7 +311,7 @@ elif menu == "🚚 Form Mob / Demob":
                     st.error(f"Terjadi kesalahan koneksi: {err}")
 
 # ------------------------------------------
-# MENU 5: LOG TRANSAKSI
+# MENU 5: LOG TRANSAKSI PERMANEN
 # ------------------------------------------
 elif menu == "📜 Log Transaksi Permanen":
     st.title("📜 Log Transaksi Real-Time (Google Sheets)")
