@@ -64,6 +64,36 @@ st.markdown(
     .jf-section-label { color:#69e4ff; font-size:10px; letter-spacing:1.8px; font-weight:850; text-transform:uppercase; margin:12px 0 6px; }
     .jf-hero { position:relative; overflow:hidden; }
     .jf-hero:after { content:""; position:absolute; width:210px; height:210px; right:-75px; top:-95px; border:1px solid rgba(67,217,255,.22); border-radius:50%; box-shadow:0 0 0 22px rgba(67,217,255,.035),0 0 0 48px rgba(67,217,255,.025); pointer-events:none; }
+
+    /* High-contrast readability fixes for Streamlit widgets */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] { color:#f3f7fc !important; }
+    [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] li, [data-testid="stCaptionContainer"],
+    .stText, label, .stCheckbox label, .stRadio label, .stSelectbox label,
+    .stMultiSelect label, .stTextInput label, .stNumberInput label,
+    .stDateInput label, .stTimeInput label, .stFileUploader label { color:#e8eef7 !important; }
+    input, textarea, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea,
+    [data-baseweb="select"] *, [data-baseweb="tag"] { color:#f8fafc !important; -webkit-text-fill-color:#f8fafc !important; }
+    div[data-baseweb="input"] > div, div[data-baseweb="textarea"] > div,
+    div[data-baseweb="select"] > div, [data-testid="stDateInput"] input,
+    [data-testid="stNumberInput"] input, [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea {
+        background:#172334 !important; border-color:#52657b !important; color:#f8fafc !important;
+    }
+    input::placeholder, textarea::placeholder { color:#b8c5d5 !important; -webkit-text-fill-color:#b8c5d5 !important; opacity:1 !important; }
+    [data-baseweb="popover"], [data-baseweb="menu"], ul[role="listbox"],
+    li[role="option"], [data-baseweb="select"] [role="option"] {
+        background:#172334 !important; color:#f8fafc !important;
+    }
+    li[role="option"]:hover, [role="option'][aria-selected="true"] { background:#254365 !important; color:#ffffff !important; }
+    [data-testid="stDataFrame"], [data-testid="stTable"] { color:#f8fafc !important; }
+    [data-testid="stAlert"] p { color:inherit !important; }
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stSidebar"] label, [data-testid="stSidebar"] small { color:#edf6ff !important; }
+    .stButton > button, .stFormSubmitButton > button { color:#ffffff !important; }
+    @media (prefers-color-scheme: light) {
+        input, textarea, [data-baseweb="select"] *, [data-baseweb="tag"] { color:#f8fafc !important; }
+    }
     @media (max-width: 768px) { .jf-brand-name { font-size:17px; } .jf-hero { padding:18px; } }
     </style>
     """,
@@ -244,7 +274,7 @@ def clean_text_series(series):
 # LOGIN / REGISTER
 # =========================================================
 if not st.session_state.logged_in:
-    st.title("Login & Register - KPP INDE")
+    st.title("Login & Register - Jobsite Fleet System")
     st.markdown("Silakan masuk menggunakan akun terdaftar atau buat akun baru.")
 
     tab_login, tab_reg = st.tabs(["Login", "Register Akun Baru"])
@@ -439,7 +469,7 @@ if st.sidebar.button("⇥  Logout"):
 # =========================================================
 # 1. DASHBOARD OVERVIEW
 # =========================================================
-st.markdown("<div class='jf-hero'><div class='jf-kicker'>KPP INDE MINING @2026</div><div class='jf-title'>Monitoring Unit KPP INDE</div><div class='jf-subtitle'>Monitor unit movement, jobsite readiness, and DEMOB closure from one operational workspace.</div></div>", unsafe_allow_html=True)
+st.markdown("<div class='jf-hero'><div class='jf-kicker'>Fleet intelligence platform</div><div class='jf-title'>Jobsite Fleet Management</div><div class='jf-subtitle'>Monitor unit movement, jobsite readiness, and DEMOB closure from one operational workspace.</div></div>", unsafe_allow_html=True)
 if menu == "Dashboard Overview":
     st.title("Dashboard Fleet & Operational Overview")
     st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Equipment Status Description.")
