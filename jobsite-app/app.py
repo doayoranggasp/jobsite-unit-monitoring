@@ -61,21 +61,25 @@ if not st.session_state.logged_in:
                         try:
                             df_users = conn.read(worksheet="Users", ttl=0)
                             if not df_users.empty:
+                                # Normalisasi tipe data string & bersihkan format .0 jika terbaca angka
+                                df_users['Username'] = df_users['Username'].astype(str).str.strip()
+                                df_users['Password'] = df_users['Password'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                                
                                 user_match = df_users[
-                                    (df_users['Username'].astype(str).str.strip() == l_user.strip()) & 
-                                    (df_users['Password'].astype(str).str.strip() == l_pass.strip())
+                                    (df_users['Username'] == l_user.strip()) & 
+                                    (df_users['Password'] == l_pass.strip())
                                 ]
                                 if not user_match.empty:
                                     st.session_state.logged_in = True
-                                    st.session_state.username = l_user
+                                    st.session_state.username = l_user.strip()
                                     st.success(f"Login Berhasil! Selamat datang, {l_user}.")
                                     st.rerun()
                                 else:
                                     st.error("Username atau Password salah!")
                             else:
-                                st.error("Belum ada data user di Google Sheets. Silakan daftarkan akun baru via tab Register.")
+                                st.error("Belum ada data user di Google Sheets.")
                         except Exception as e:
-                            st.error("Tab 'Users' belum tersedia di Google Sheets. Silakan daftarkan akun pertama Anda melalui tab 'Register Akun Baru' di sebelah kanan agar tab otomatis dibuat.")
+                            st.error(f"Gagal memverifikasi user: {e}")
                     else:
                         st.error("Koneksi Google Sheets belum dikonfigurasi pada Streamlit Secrets.")
 
@@ -92,7 +96,7 @@ if not st.session_state.logged_in:
                     payload = {
                         "action": "register",
                         "username": r_user,
-                        "password": r_pass,
+                        "password": str(r_pass), # Pastikan dikirim sebagai string
                         "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     }
                     try:
@@ -100,7 +104,7 @@ if not st.session_state.logged_in:
                         res = requests.post(webapp_url, json=payload)
                         res_json = res.json()
                         if res_json.get("result") == "success":
-                            st.success("Pendaftaran berhasil! Tab 'Users' telah otomatis dibuat di Google Sheets. Silakan pindah ke tab Login.")
+                            st.success("Pendaftaran berhasil! Silakan pindah ke tab Login.")
                         else:
                             st.warning(res_json.get('message', 'Gagal mendaftar.'))
                     except Exception as err:
