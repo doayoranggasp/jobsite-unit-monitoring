@@ -34,7 +34,7 @@ if "username" not in st.session_state:
 def get_gsheets_connection():
     try:
         return st.connection("gsheets", type=GSheetsConnection)
-    except Exception as e:
+    except:
         return None
 
 # ==========================================
@@ -99,20 +99,31 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# PARSER MASTER DENGAN DEBUG TRANSPARAN
+# PARSER MASTER CERDAS & OTOMATIS
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
     conn = get_gsheets_connection()
     if not conn:
-        return pd.DataFrame(), "Koneksi GSheets gagal diinisialisasi (Cek Streamlit Secrets)."
+        return pd.DataFrame()
     try:
-        # Membaca tanpa header agar seluruh baris terbaca utuh
         df_raw = conn.read(worksheet="MSE600", ttl=0, header=None)
-        if df_raw.empty:
-            return pd.DataFrame(), "Tab MSE600 di Google Sheets kosong."
+        if df_raw.empty or len(df_raw) < 1:
+            return pd.DataFrame()
         
-        df_cleaned = df_raw.copy().reset_index(drop=True)
+        # Cari baris yang berisi header tabel secara otomatis
+        header_row = 0
+        for i in range(len(df_raw)):
+            row_text = " ".join(df_raw.iloc[i].astype(str).values).lower()
+            if "equip" in row_text or "unit" in row_text or "no" in row_text:
+                header_row = i
+                break
+        
+        # Ambil data setelah baris header
+        df_cleaned = df_raw.iloc[header_row + 1:].copy().reset_index(drop=True)
+        if df_cleaned.empty:
+            return pd.DataFrame()
+            
         ncols = df_cleaned.shape[1]
         
         def get_col(idx):
@@ -129,18 +140,18 @@ def load_master_from_cloud():
             'Serial_Number_Info': get_col(11) if ncols > 11 else get_col(6)
         })
         
-        # Buang baris kosong
+        # Bersihkan baris kosong atau teks header yang ikut terbawa
         result_df = result_df[
             (result_df['Equipment_No'] != '') & 
             (result_df['Equipment_No'].str.lower() != 'nan') & 
-            (result_df['Equipment_No'].str.lower() != 'none')
+            (result_df['Equipment_No'].str.lower() != 'none') &
+            (~result_df['Equipment_No'].str.lower().str.contains('equipment|equip|no|unit'))
         ]
-        
-        return result_df, None
+        return result_df
     except Exception as e:
-        return pd.DataFrame(), str(e)
+        return pd.DataFrame()
 
-df_master, cloud_error = load_master_from_cloud()
+df_master = load_master_from_cloud()
 
 # ==========================================
 # SIDEBAR NAVIGATION
@@ -177,10 +188,7 @@ if menu == "Dashboard Overview":
     st.markdown("---")
 
     if df_master.empty:
-        st.warning("⚠️ Belum ada Data Master MSE600 di Google Sheets atau gagal dimuat.")
-        if cloud_error:
-            st.error(f"Detail Error dari Cloud: {cloud_error}")
-        st.info("Silakan buka menu **Upload / Update Master MSE600** di sidebar untuk mengunggah file Excel Anda.")
+        st.warning("Belum ada Data Master MSE600 atau format kolom belum terbaca. Silakan upload ulang file Excel Anda melalui menu **Upload / Update Master MSE600** di sidebar.")
     else:
         total_unit = len(df_master)
         available_unit = len(df_master[df_master['Status_Code'].str.upper() == 'AV'])
@@ -212,9 +220,7 @@ if menu == "Dashboard Overview":
 elif menu == "Master Data Unit":
     st.title("Master Data Equipment (Live)")
     if df_master.empty:
-        st.warning("Data Master belum tersedia.")
-        if cloud_error:
-            st.error(f"Detail Error: {cloud_error}")
+        st.warning("Data Master belum tersedia. Silakan upload file Excel MSE600.")
     else:
         search = st.text_input("Cari Unit No / Nama / Serial Number:")
         filtered = df_master
@@ -231,10 +237,6 @@ elif menu == "Master Data Unit":
 # ------------------------------------------
 elif menu == "Upload / Update Master MSE600":
     st.title("Upload & Perbarui Master Data MSE600")
-    
-    if cloud_error:
-        st.error(f"Status Koneksi/Pembacaan Saat Ini: {cloud_error}")
-        
     uploaded_file = st.file_uploader("Pilih file Excel MSE600 (.xlsx)", type=["xlsx", "xls"])
     
     if uploaded_file is not None:
@@ -253,7 +255,7 @@ elif menu == "Upload / Update Master MSE600":
                 else:
                     st.error("Gagal menyimpan ke cloud.")
             except Exception as e:
-                st.error(f"Error Upload: {e}")
+                st.error(f"Error: {e}")
                 
     st.markdown("---")
     if st.checkbox("🔍 Debug Lihat Data Mentah di Cloud"):
@@ -261,10 +263,10 @@ elif menu == "Upload / Update Master MSE600":
         if conn:
             try:
                 raw = conn.read(worksheet="MSE600", ttl=0, header=None)
-                st.write(f"Total Baris Terbaca dari Cloud: {len(raw)}")
-                st.dataframe(raw.head(15), use_container_width=True)
+                st.write(f"Total Baris di Tab MSE600: {len(raw)}")
+                st.dataframe(raw.head(10), use_container_width=True)
             except Exception as e:
-                st.error(f"Gagal baca mentah: {e}")
+                st.error(f"Gagal baca: {e}")
 
 # ------------------------------------------
 # 4. FORM MOB / DEMOB
