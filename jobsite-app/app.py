@@ -437,7 +437,7 @@ except Exception as exc:
 # =========================================================
 if st.session_state.company_logo_bytes:
     st.sidebar.image(st.session_state.company_logo_bytes, use_container_width=True)
-st.sidebar.markdown("<div class='jf-brand-card'><div class='jf-brand-mark'>KPP INDE</div><div class='jf-brand-name'>JOBSITE FLEET<br>SYSTEM</div><div class='jf-brand-caption'>Operations Control Platform</div></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div class='jf-brand-card'><div class='jf-brand-mark'>KPP</div><div class='jf-brand-name'>JOBSITE FLEET<br>SYSTEM</div><div class='jf-brand-caption'>Operations Control Platform</div></div>", unsafe_allow_html=True)
 st.sidebar.markdown(f"<div class='jf-user-chip'>● &nbsp; Signed in as <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
 
 menu = st.sidebar.radio(
