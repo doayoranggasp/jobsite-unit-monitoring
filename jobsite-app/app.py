@@ -19,18 +19,27 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton > button {
-        width: 100%;
-        background-color: #007bff;
-        color: white;
-        border-radius: 8px;
-        font-weight: bold;
-    }
+    :root { --jf-bg:#07111f; --jf-panel:rgba(14,29,49,.86); --jf-line:rgba(80,190,255,.24); --jf-cyan:#43d9ff; --jf-blue:#397bff; }
+    .stApp { background: radial-gradient(ellipse at 10% 0%, #102d4b 0%, #081525 38%, #050b14 100%); color:#e8f4ff; }
+    [data-testid="stHeader"] { background:rgba(4,12,22,.78); }
+    [data-testid="stSidebar"] { background:linear-gradient(180deg,#071526 0%,#0a1d31 100%); border-right:1px solid var(--jf-line); }
+    [data-testid="stSidebar"] * { color:#e8f4ff; }
+    h1,h2,h3 { color:#f3faff !important; letter-spacing:.2px; }
+    [data-testid="stMetric"] { background:linear-gradient(145deg,rgba(18,43,68,.95),rgba(8,20,36,.92)); border:1px solid var(--jf-line); padding:16px; border-radius:16px; box-shadow:0 8px 28px rgba(0,0,0,.18); }
+    [data-testid="stMetricValue"] { color:var(--jf-cyan); }
+    .stButton > button, .stFormSubmitButton > button { width:100%; background:linear-gradient(100deg,#0878c9,#315bff); color:white; border:1px solid rgba(100,220,255,.4); border-radius:10px; font-weight:700; transition:all .2s ease; }
+    .stButton > button:hover, .stFormSubmitButton > button:hover { border-color:#70e5ff; box-shadow:0 0 18px rgba(67,217,255,.24); transform:translateY(-1px); }
+    [data-testid="stDataFrame"], [data-testid="stTable"] { border:1px solid var(--jf-line); border-radius:12px; overflow:hidden; }
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div, textarea { background:rgba(6,18,32,.88) !important; }
+    .jf-hero { padding:22px 26px; margin:4px 0 22px; border:1px solid rgba(67,217,255,.32); border-radius:18px; background:linear-gradient(115deg,rgba(14,54,83,.92),rgba(13,25,52,.84)); box-shadow:0 12px 34px rgba(0,0,0,.22); }
+    .jf-kicker { color:#69e4ff; font-size:12px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
+    .jf-title { font-size:clamp(24px,3vw,38px); font-weight:850; margin:5px 0; color:#f4fbff; }
+    .jf-subtitle { color:#a9c7df; font-size:14px; }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
 
 # =========================================================
 # SESSION STATE
@@ -39,6 +48,18 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
+if "company_logo_bytes" not in st.session_state:
+    st.session_state.company_logo_bytes = None
+if "background_bytes" not in st.session_state:
+    st.session_state.background_bytes = None
+
+# Uploaded branding is held in the active Streamlit session (not persisted to Google Sheets).
+import base64
+_logo = st.session_state.company_logo_bytes
+_bg = st.session_state.background_bytes
+if _bg:
+    _bg64 = base64.b64encode(_bg).decode("ascii")
+    st.markdown(f"<style>.stApp {{ background-image:linear-gradient(rgba(4,12,24,.84),rgba(4,12,24,.91)),url('data:image/jpeg;base64,{_bg64}'); background-size:cover; background-position:center; background-attachment:fixed; }}</style>", unsafe_allow_html=True)
 
 
 # =========================================================
@@ -314,7 +335,9 @@ except Exception as exc:
 # =========================================================
 # SIDEBAR NAVIGATION
 # =========================================================
-st.sidebar.title("Jobsite Fleet System")
+if st.session_state.company_logo_bytes:
+    st.sidebar.image(st.session_state.company_logo_bytes, use_container_width=True)
+st.sidebar.markdown("<div class='jf-kicker'>Operations Control</div><div style='font-size:22px;font-weight:850;line-height:1.2'>JOBSITE FLEET<br>SYSTEM</div><div style='color:#8bb6d5;font-size:12px;margin-top:6px'>MOB / DEMOB MANAGEMENT</div>", unsafe_allow_html=True)
 st.sidebar.info(f"Operator: {st.session_state.username}")
 
 menu = st.sidebar.radio(
@@ -326,6 +349,8 @@ menu = st.sidebar.radio(
         "Upload / Update Master MSE600",
         "Form Mob / Demob",
         "Log Transaksi Permanen",
+        "Pengaturan Tampilan",
+        "Tutup Proses DEMOB",
     ],
 )
 
@@ -344,6 +369,7 @@ if st.sidebar.button("Logout"):
 # =========================================================
 # 1. DASHBOARD OVERVIEW
 # =========================================================
+st.markdown("<div class='jf-hero'><div class='jf-kicker'>Fleet intelligence platform</div><div class='jf-title'>Jobsite Fleet Management</div><div class='jf-subtitle'>Monitor unit movement, jobsite readiness, and DEMOB closure from one operational workspace.</div></div>", unsafe_allow_html=True)
 if menu == "Dashboard Overview":
     st.title("Dashboard Fleet & Operational Overview")
     st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Equipment Status Description.")
@@ -688,3 +714,83 @@ elif menu == "Log Transaksi Permanen":
                 "Gagal membaca tab Log_Trans. Periksa nama worksheet, "
                 f"izin akses, dan konfigurasi koneksi. Detail: {exc}"
             )
+
+
+# =========================================================
+# 6. SETTINGS: COMPANY BRANDING
+# =========================================================
+elif menu == "Pengaturan Tampilan":
+    st.title("Pengaturan Tampilan")
+    st.markdown("Unggah identitas visual agar dashboard terasa lebih sesuai dengan perusahaan.")
+    st.warning("Logo dan background yang diunggah di sini tersimpan pada sesi browser Streamlit saat ini saja. Untuk permanen bagi semua pengguna, simpan aset di hosting/Google Drive dan konfigurasi URL tetap.")
+    col_logo, col_bg = st.columns(2)
+    with col_logo:
+        st.subheader("Logo Perusahaan")
+        logo_file = st.file_uploader("Upload logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="branding_logo_upload")
+        if logo_file:
+            st.session_state.company_logo_bytes = logo_file.getvalue()
+        if st.session_state.company_logo_bytes:
+            st.image(st.session_state.company_logo_bytes, caption="Preview logo", width=220)
+            if st.button("Hapus logo dari sesi", key="clear_logo"):
+                st.session_state.company_logo_bytes = None
+                st.rerun()
+    with col_bg:
+        st.subheader("Background Dashboard")
+        bg_file = st.file_uploader("Upload background (JPG/PNG)", type=["png", "jpg", "jpeg"], key="branding_bg_upload")
+        if bg_file:
+            st.session_state.background_bytes = bg_file.getvalue()
+        if st.session_state.background_bytes:
+            st.image(st.session_state.background_bytes, caption="Preview background", use_container_width=True)
+            if st.button("Hapus background dari sesi", key="clear_bg"):
+                st.session_state.background_bytes = None
+                st.rerun()
+    st.caption("Saran: gunakan logo PNG transparan dan background landscape dengan kontras rendah agar teks tetap terbaca.")
+
+# =========================================================
+# 7. CLOSE DEMOB PROCESS
+# =========================================================
+elif menu == "Tutup Proses DEMOB":
+    st.title("Tutup Proses DEMOB")
+    st.caption("Tutup transaksi DEMOB setelah unit dan dokumen sudah diverifikasi selesai. Tindakan ini mencatat waktu penutupan dan username PIC.")
+    conn = get_gsheets_connection()
+    if conn is None:
+        st.error("Koneksi Google Sheets tidak tersedia untuk membaca transaksi.")
+    else:
+        try:
+            logs = conn.read(worksheet=get_worksheet_id("log_trans_gid"), ttl=0)
+            if logs is None or logs.empty:
+                st.info("Belum ada transaksi.")
+            else:
+                if "Process_Status" not in logs.columns:
+                    logs["Process_Status"] = "OPEN"
+                logs["Process_Status"] = logs["Process_Status"].fillna("").astype(str).str.strip().str.upper()
+                demobs = logs[logs["Jenis_Aksi"].astype(str).str.contains("DEMOB", case=False, na=False)].copy()
+                demobs.loc[demobs["Process_Status"] == "", "Process_Status"] = "OPEN"
+                open_demobs = demobs[demobs["Process_Status"] == "OPEN"]
+                m1,m2,m3 = st.columns(3)
+                m1.metric("Total DEMOB", len(demobs))
+                m2.metric("OPEN", len(open_demobs))
+                m3.metric("CLOSE", int((demobs["Process_Status"] == "CLOSE").sum()))
+                if open_demobs.empty:
+                    st.success("Tidak ada proses DEMOB berstatus OPEN.")
+                else:
+                    show_cols = [c for c in ["Tanggal_Transaksi","Equipment_No","Nama_Unit","Lokasi_Asal","Lokasi_Tujuan","PIC","Request_ID","Process_Status"] if c in open_demobs.columns]
+                    st.dataframe(open_demobs[show_cols], use_container_width=True, hide_index=True)
+                    options = open_demobs.to_dict("records")
+                    labels = [f"{r.get('Equipment_No','')} | {r.get('Tanggal_Transaksi','')} | {r.get('Lokasi_Asal','')} → {r.get('Lokasi_Tujuan','')}" for r in options]
+                    selected = st.selectbox("Pilih proses DEMOB yang selesai diverifikasi", range(len(options)), format_func=lambda i: labels[i])
+                    confirm = st.checkbox("Saya sudah memverifikasi proses DEMOB dan menyetujui penutupan.")
+                    if st.button("Tutup Proses DEMOB", type="primary", disabled=not confirm):
+                        req_id = str(options[selected].get("Request_ID", "")).strip()
+                        if not req_id:
+                            st.error("Request_ID kosong; proses tidak dapat ditutup dengan aman.")
+                        else:
+                            response = post_to_webapp({"action":"close_demob","Request_ID":req_id,"Closed_By":st.session_state.username})
+                            if api_success(response):
+                                st.success(response.get("message", "Proses ditutup."))
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.error(response.get("message", "Gagal menutup proses DEMOB."))
+        except Exception as exc:
+            st.error(f"Gagal memuat atau memperbarui status DEMOB: {exc}")
