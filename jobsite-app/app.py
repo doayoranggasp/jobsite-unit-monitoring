@@ -11,7 +11,7 @@ from streamlit_gsheets import GSheetsConnection
 # =========================================================
 st.set_page_config(
     page_title="KPP INDE-ALL UNIT",
-    page_icon="🚜",
+    page_icon="LOGO KPP COLOR_50 PNG.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
