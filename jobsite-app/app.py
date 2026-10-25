@@ -105,54 +105,46 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# APLIKASI UTAMA (ROBUST PARSER)
+# APLIKASI UTAMA (CLEAN & SAFE PARSER)
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
     conn = get_gsheets_connection()
-    if conn:
-        try:
-            df_raw = conn.read(worksheet="MSE600", ttl=0, header=None)
-            if df_raw.empty or len(df_raw) < 1:
-                return pd.DataFrame()
-            
-            # Deteksi otomatis baris awal data
-            start_row = 3 if len(df_raw) > 3 else 0
-            df_content = df_raw.iloc[start_row:].copy()
-            df_content = df_content.reset_index(drop=True)
-            
-            cols_count = df_content.shape[1]
-            
-            # Ambil kolom secara aman berdasarkan posisi indeks
-            eq_no = df_content.iloc[:, 0] if cols_count > 0 else pd.Series([""] * len(df_content))
-            eq_name = df_content.iloc[:, 2] if cols_count > 2 else (df_content.iloc[:, 1] if cols_count > 1 else eq_no)
-            stat_code = df_content.iloc[:, 3] if cols_count > 3 else pd.Series(["AV"] * len(df_content))
-            stat_desc = df_content.iloc[:, 4] if cols_count > 4 else pd.Series(["Available"] * len(df_content))
-            site_code = df_content.iloc[:, 7] if cols_count > 7 else pd.Series([""] * len(df_content))
-            project_loc = df_content.iloc[:, 8] if cols_count > 8 else (df_content.iloc[:, 5] if cols_count > 5 else site_code)
-            serial_info = df_content.iloc[:, 11] if cols_count > 11 else (df_content.iloc[:, 6] if cols_count > 6 else pd.Series([""] * len(df_content))
-            
-            cleaned_df = pd.DataFrame({
-                'Equipment_No': eq_no.astype(str).str.strip(),
-                'Equipment_Name': eq_name.astype(str).str.strip(),
-                'Status_Code': stat_code.astype(str).str.strip(),
-                'Status_Description': stat_desc.astype(str).str.strip(),
-                'Site_Code': site_code.astype(str).str.strip(),
-                'Project_Location': project_loc.astype(str).str.strip(),
-                'Serial_Number_Info': serial_info.astype(str).str.strip()
-            })
-            
-            # Buang baris kosong atau header teks
-            cleaned_df = cleaned_df[
-                (cleaned_df['Equipment_No'] != '') & 
-                (cleaned_df['Equipment_No'].str.lower() != 'nan') & 
-                (~cleaned_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
-            ]
-            cleaned_df.dropna(subset=['Equipment_No'], inplace=True)
-            return cleaned_df
-        except Exception as e:
+    if not conn:
+        return pd.DataFrame()
+    try:
+        df_raw = conn.read(worksheet="MSE600", ttl=0, header=None)
+        if df_raw.empty or len(df_raw) < 1:
             return pd.DataFrame()
-    return pd.DataFrame()
+        
+        start_row = 3 if len(df_raw) > 3 else 0
+        df_content = df_raw.iloc[start_row:].copy().reset_index(drop=True)
+        cols_count = df_content.shape[1]
+        
+        def get_col(idx, default=""):
+            if cols_count > idx:
+                return df_content.iloc[:, idx].astype(str).str.strip()
+            return pd.Series([default] * len(df_content))
+        
+        cleaned_df = pd.DataFrame({
+            'Equipment_No': get_col(0),
+            'Equipment_Name': get_col(2) if cols_count > 2 else get_col(1),
+            'Status_Code': get_col(3, "AV"),
+            'Status_Description': get_col(4, "Available"),
+            'Site_Code': get_col(7),
+            'Project_Location': get_col(8) if cols_count > 8 else get_col(5),
+            'Serial_Number_Info': get_col(11) if cols_count > 11 else get_col(6)
+        })
+        
+        cleaned_df = cleaned_df[
+            (cleaned_df['Equipment_No'] != '') & 
+            (cleaned_df['Equipment_No'].str.lower() != 'nan') & 
+            (~cleaned_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
+        ]
+        cleaned_df.dropna(subset=['Equipment_No'], inplace=True)
+        return cleaned_df
+    except Exception as e:
+        return pd.DataFrame()
 
 df_master = load_master_from_cloud()
 
