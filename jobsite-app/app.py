@@ -105,7 +105,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# APLIKASI UTAMA (AUTO-DETECT MASTER PARSER)
+# APLIKASI UTAMA (ROBUST PARSER)
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
@@ -113,31 +113,41 @@ def load_master_from_cloud():
     if conn:
         try:
             df_raw = conn.read(worksheet="MSE600", ttl=0, header=None)
-            if df_raw.empty:
+            if df_raw.empty or len(df_raw) < 1:
                 return pd.DataFrame()
             
-            # Deteksi otomatis baris awal data berdasarkan isi sel pertama
-            start_row = 3
-            if len(df_raw) > 0:
-                val_col0 = str(df_raw.iloc[0, 0]).lower()
-                if 'equip' in val_col0 or 'unit' in val_col0 or 'no' in val_col0 or len(df_raw) < 4:
-                    start_row = 0  # Jika baris pertama sudah berupa header atau data langsung
-            
+            # Deteksi otomatis baris awal data
+            start_row = 3 if len(df_raw) > 3 else 0
             df_content = df_raw.iloc[start_row:].copy()
-            cols = df_content.shape[1]
+            df_content = df_content.reset_index(drop=True)
+            
+            cols_count = df_content.shape[1]
+            
+            # Ambil kolom secara aman berdasarkan posisi indeks
+            eq_no = df_content.iloc[:, 0] if cols_count > 0 else pd.Series([""] * len(df_content))
+            eq_name = df_content.iloc[:, 2] if cols_count > 2 else (df_content.iloc[:, 1] if cols_count > 1 else eq_no)
+            stat_code = df_content.iloc[:, 3] if cols_count > 3 else pd.Series(["AV"] * len(df_content))
+            stat_desc = df_content.iloc[:, 4] if cols_count > 4 else pd.Series(["Available"] * len(df_content))
+            site_code = df_content.iloc[:, 7] if cols_count > 7 else pd.Series([""] * len(df_content))
+            project_loc = df_content.iloc[:, 8] if cols_count > 8 else (df_content.iloc[:, 5] if cols_count > 5 else site_code)
+            serial_info = df_content.iloc[:, 11] if cols_count > 11 else (df_content.iloc[:, 6] if cols_count > 6 else pd.Series([""] * len(df_content))
             
             cleaned_df = pd.DataFrame({
-                'Equipment_No': df_content.iloc[:, 0].astype(str) if cols > 0 else "",
-                'Equipment_Name': df_content.iloc[:, 2].astype(str) if cols > 2 else (df_content.iloc[:, 1].astype(str) if cols > 1 else ""),
-                'Status_Code': df_content.iloc[:, 3].astype(str) if cols > 3 else "",
-                'Status_Description': df_content.iloc[:, 4].astype(str) if cols > 4 else "",
-                'Site_Code': df_content.iloc[:, 7].astype(str) if cols > 7 else "",
-                'Project_Location': df_content.iloc[:, 8].astype(str) if cols > 8 else (df_content.iloc[:, 5].astype(str) if cols > 5 else ""),
-                'Serial_Number_Info': df_content.iloc[:, 11].astype(str) if cols > 11 else (df_content.iloc[:, 6].astype(str) if cols > 6 else "")
+                'Equipment_No': eq_no.astype(str).str.strip(),
+                'Equipment_Name': eq_name.astype(str).str.strip(),
+                'Status_Code': stat_code.astype(str).str.strip(),
+                'Status_Description': stat_desc.astype(str).str.strip(),
+                'Site_Code': site_code.astype(str).str.strip(),
+                'Project_Location': project_loc.astype(str).str.strip(),
+                'Serial_Number_Info': serial_info.astype(str).str.strip()
             })
             
-            # Bersihkan baris kosong atau baris header tiruan
-            cleaned_df = cleaned_df[~cleaned_df['Equipment_No'].isin(['nan', '', 'Equipment_No', 'Equipment No', 'Equip No', 'Equipment', 'None'])]
+            # Buang baris kosong atau header teks
+            cleaned_df = cleaned_df[
+                (cleaned_df['Equipment_No'] != '') & 
+                (cleaned_df['Equipment_No'].str.lower() != 'nan') & 
+                (~cleaned_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
+            ]
             cleaned_df.dropna(subset=['Equipment_No'], inplace=True)
             return cleaned_df
         except Exception as e:
@@ -272,7 +282,7 @@ elif menu == "Form Mob / Demob":
     st.markdown("Setiap input transaksi akan mencatat log DAN memperbarui lokasi serta status unit di Master Cloud secara otomatis.")
 
     if df_master.empty:
-        st.warning("Data Master belum tersedia. Upload file Excel MSE600 terlebih dahulu di menu Upload / Update Master MSE600.")
+        st.warning("Data Master belum tersedia. Silakan upload ulang file Excel MSE600 di menu **Upload / Update Master MSE600**.")
     else:
         with st.form("form_mob_demob", clear_on_submit=True):
             col_a, col_b = st.columns(2)
