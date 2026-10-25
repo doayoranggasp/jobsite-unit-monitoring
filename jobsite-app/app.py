@@ -10,7 +10,7 @@ from streamlit_gsheets import GSheetsConnection
 # CONFIGURATION
 # =========================================================
 st.set_page_config(
-    page_title="Jobsite Fleet Management System",
+    page_title="KPP INDE-ALL UNIT",
     page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded",
