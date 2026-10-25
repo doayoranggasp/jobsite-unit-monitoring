@@ -54,7 +54,7 @@ menu = st.sidebar.radio(
 )
 
 # ==========================================
-# DATA LOADING FUNCTION
+# DATA LOADING FUNCTION (EXCEL UPLOAD)
 # ==========================================
 @st.cache_data
 def load_and_clean_master(file):
@@ -74,7 +74,7 @@ def load_and_clean_master(file):
         cleaned_df.dropna(subset=['Equipment_No'], inplace=True)
         return cleaned_df
     except Exception as e:
-        st.error(f"Error membaca database master unit: {e}")
+        st.error(f"Error membaca file master: {e}")
         return pd.DataFrame()
 
 if uploaded_file is not None:
@@ -90,7 +90,7 @@ if menu == "📊 Dashboard Overview":
     st.markdown("---")
 
     if df_master.empty:
-        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu melalui sidebar.")
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu melalui menu *Upload Data Master* di sidebar kiri.")
     else:
         total_unit = len(df_master)
         available_unit = len(df_master[df_master['Status_Code'] == 'AV'])
@@ -151,10 +151,10 @@ elif menu == "🔍 Master Data Unit":
 # ==========================================
 elif menu == "🚚 Form Mob / Demob":
     st.title("🚚 Input Mobilisasi & Demobilisasi (Simpan Permanen)")
-    st.markdown("Setiap data yang di-submit akan langsung tersimpan otomatis via Apps Script Web App.")
+    st.markdown("Setiap data yang di-submit akan langsung tersimpan otomatis ke Google Sheets.")
 
     if df_master.empty:
-        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu di sidebar.")
+        st.warning("⚠️ Silakan upload file Excel master **MSE600** terlebih dahulu di sidebar agar daftar unit muncul.")
     else:
         with st.form("form_mob_demob", clear_on_submit=True):
             col_a, col_b = st.columns(2)
@@ -194,7 +194,7 @@ elif menu == "🚚 Form Mob / Demob":
                     if response.status_code == 200:
                         st.success(f"✅ Berhasil! Transaksi {jenis_aksi} unit {eq_no} telah tersimpan permanen di Google Sheets.")
                     else:
-                        st.error(f"Gagal mengirim data ke Web App. Status code: {response.status_code}")
+                        st.error(f"Gagal mengirim data. Status code: {response.status_code}")
                 except Exception as err:
                     st.error(f"Terjadi kesalahan koneksi: {err}")
 
@@ -207,10 +207,10 @@ elif menu == "📜 Log Transaksi Permanen":
     conn = get_gsheets_connection()
     if conn:
         try:
-            db_data = conn.read(ttl=0)
+            db_data = conn.read(worksheet="Log_Trans", ttl=0)
             st.dataframe(db_data, use_container_width=True)
             
             csv = db_data.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Export Log Database (CSV)", csv, "log_database_mob_demob.csv", "text/csv")
         except Exception as e:
-            st.info("Belum ada data transaksi atau Google Sheets masih kosong.")
+            st.info("Belum ada data transaksi di Google Sheets atau tab Log_Trans kosong.")
