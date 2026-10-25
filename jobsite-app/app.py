@@ -25,7 +25,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Session State Inisialisasi
+# Session State
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -42,70 +42,58 @@ def get_gsheets_connection():
 # ==========================================
 if not st.session_state.logged_in:
     st.title("Login & Register - Jobsite Fleet System")
-    st.markdown("Silakan masuk menggunakan akun Anda atau daftarkan akun baru untuk mulai mengakses dashboard.")
+    st.markdown("Silakan masuk menggunakan akun terdaftar atau buat akun baru.")
     
-    auth_tab1, auth_tab2 = st.tabs(["Login", "Register Akun Baru"])
+    tab_login, tab_reg = st.tabs(["Login", "Register Akun Baru"])
     
-    with auth_tab1:
-        with st.form("login_form"):
+    with tab_login:
+        with st.form("form_login"):
             l_user = st.text_input("Username")
             l_pass = st.text_input("Password", type="password")
-            l_btn = st.form_submit_button("Masuk ke Sistem")
+            btn_login = st.form_submit_button("Masuk ke Sistem")
             
-            if l_btn:
+            if btn_login:
                 if not l_user or not l_pass:
                     st.warning("Username dan Password wajib diisi!")
                 else:
-                    payload = {
-                        "action": "login",
-                        "username": l_user,
-                        "password": l_pass
-                    }
                     try:
                         webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
-                        res = requests.post(webapp_url, json=payload)
+                        res = requests.post(webapp_url, json={"action": "login", "username": l_user, "password": l_pass})
                         res_json = res.json()
-                        
                         if res_json.get("result") == "success":
                             st.session_state.logged_in = True
                             st.session_state.username = l_user.strip()
-                            st.success(f"Login Berhasil! Selamat datang, {l_user}.")
+                            st.success("Login Berhasil!")
                             st.rerun()
                         else:
-                            st.error(res_json.get("message", "Username atau Password salah!"))
-                    except Exception as err:
-                        st.error(f"Gagal terhubung ke server: {err}")
+                            st.error(res_json.get("message", "Login gagal."))
+                    except Exception as e:
+                        st.error(f"Error koneksi: {e}")
 
-    with auth_tab2:
-        with st.form("register_form"):
-            r_user = st.text_input("Buat Username Baru")
-            r_pass = st.text_input("Buat Password Baru", type="password")
-            r_btn = st.form_submit_button("Daftar Akun")
+    with tab_reg:
+        with st.form("form_reg"):
+            r_user = st.text_input("Username Baru")
+            r_pass = st.text_input("Password Baru", type="password")
+            btn_reg = st.form_submit_button("Daftar Akun")
             
-            if r_btn:
+            if btn_reg:
                 if not r_user or not r_pass:
                     st.warning("Semua kolom wajib diisi!")
                 else:
-                    payload = {
-                        "action": "register",
-                        "username": r_user,
-                        "password": str(r_pass),
-                        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
                     try:
                         webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
-                        res = requests.post(webapp_url, json=payload)
+                        res = requests.post(webapp_url, json={"action": "register", "username": r_user, "password": str(r_pass), "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
                         res_json = res.json()
                         if res_json.get("result") == "success":
                             st.success("Pendaftaran berhasil! Silakan pindah ke tab Login.")
                         else:
-                            st.warning(res_json.get('message', 'Gagal mendaftar.'))
-                    except Exception as err:
-                        st.error(f"Error koneksi: {err}")
+                            st.warning(res_json.get("message", "Gagal mendaftar."))
+                    except Exception as e:
+                        st.error(f"Error koneksi: {e}")
     st.stop()
 
 # ==========================================
-# APLIKASI UTAMA (FLEXIBLE MASTER PARSER)
+# PARSER CERDAS (AUTO-MAPPING DATA MASTER)
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
@@ -114,39 +102,50 @@ def load_master_from_cloud():
         return pd.DataFrame()
     try:
         df_raw = conn.read(worksheet="MSE600", ttl=0, header=None)
-        if df_raw.empty or len(df_raw) < 1:
+        if df_raw.empty:
             return pd.DataFrame()
         
-        df_content = df_raw.copy().reset_index(drop=True)
-        cols_count = df_content.shape[1]
+        # Cari baris header secara otomatis
+        header_idx = 0
+        for idx in range(min(10, len(df_raw))):
+            row_str = " ".join(df_raw.iloc[idx].astype(str).values).lower()
+            if "equip" in row_str or "unit" in row_str or "equipment_no" in row_str:
+                header_idx = idx
+                break
+        
+        df_cleaned = df_raw.iloc[header_idx + 1:].copy() if header_idx > 0 else df_raw.iloc[1:].copy()
+        df_cleaned = df_cleaned.reset_index(drop=True)
+        cols_count = df_cleaned.shape[1]
         
         if cols_count == 0:
             return pd.DataFrame()
         
-        # Pemetaan kolom secara fleksibel
-        cleaned_df = pd.DataFrame({
-            'Equipment_No': df_content.iloc[:, 0].astype(str).str.strip(),
-            'Equipment_Name': df_content.iloc[:, 2].astype(str).str.strip() if cols_count > 2 else df_content.iloc[:, 1].astype(str).str.strip(),
-            'Status_Code': df_content.iloc[:, 3].astype(str).str.strip() if cols_count > 3 else "AV",
-            'Status_Description': df_content.iloc[:, 4].astype(str).str.strip() if cols_count > 4 else "Available",
-            'Site_Code': df_content.iloc[:, 7].astype(str).str.strip() if cols_count > 7 else "",
-            'Project_Location': df_content.iloc[:, 8].astype(str).str.strip() if cols_count > 8 else (df_content.iloc[:, 5].astype(str).str.strip() if cols_count > 5 else ""),
-            'Serial_Number_Info': df_content.iloc[:, 11].astype(str).str.strip() if cols_count > 11 else (df_content.iloc[:, 6].astype(str).str.strip() if cols_count > 6 else "")
+        # Pemetaan kolom dinamis
+        res_df = pd.DataFrame({
+            'Equipment_No': df_cleaned.iloc[:, 0].astype(str).str.strip(),
+            'Equipment_Name': df_cleaned.iloc[:, 2].astype(str).str.strip() if cols_count > 2 else df_cleaned.iloc[:, 1].astype(str).str.strip(),
+            'Status_Code': df_cleaned.iloc[:, 3].astype(str).str.strip() if cols_count > 3 else "AV",
+            'Status_Description': df_cleaned.iloc[:, 4].astype(str).str.strip() if cols_count > 4 else "Available",
+            'Project_Location': df_cleaned.iloc[:, 8].astype(str).str.strip() if cols_count > 8 else (df_cleaned.iloc[:, 5].astype(str).str.strip() if cols_count > 5 else ""),
+            'Serial_Number_Info': df_cleaned.iloc[:, 11].astype(str).str.strip() if cols_count > 11 else (df_cleaned.iloc[:, 6].astype(str).str.strip() if cols_count > 6 else "")
         })
         
-        # Hanya buang baris yang Equipment_No-nya kosong, nan, atau none
-        cleaned_df = cleaned_df[
-            (cleaned_df['Equipment_No'] != '') & 
-            (cleaned_df['Equipment_No'].str.lower() != 'nan') & 
-            (cleaned_df['Equipment_No'].str.lower() != 'none')
+        # Filter baris valid
+        res_df = res_df[
+            (res_df['Equipment_No'] != '') & 
+            (res_df['Equipment_No'].str.lower() != 'nan') & 
+            (res_df['Equipment_No'].str.lower() != 'none') &
+            (~res_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
         ]
-        return cleaned_df
-    except Exception as e:
+        return res_df
+    except Exception:
         return pd.DataFrame()
 
 df_master = load_master_from_cloud()
 
-# Sidebar Navigation
+# ==========================================
+# SIDEBAR NAVIGATION
+# ==========================================
 st.sidebar.title("Jobsite Fleet System")
 st.sidebar.info(f"Operator: {st.session_state.username}")
 
@@ -172,14 +171,14 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 # ------------------------------------------
-# MENU 1: DASHBOARD OVERVIEW
+# 1. DASHBOARD OVERVIEW
 # ------------------------------------------
 if menu == "Dashboard Overview":
     st.title("Dashboard Fleet & Operational Overview")
     st.markdown("---")
 
     if df_master.empty:
-        st.warning("Belum ada Data Master MSE600 di Google Sheets. Silakan upload file Excel master Anda melalui menu Upload / Update Master MSE600 di sidebar.")
+        st.warning("Belum ada Data Master MSE600 di Google Sheets. Silakan upload file Excel master Anda melalui menu **Upload / Update Master MSE600**.")
     else:
         total_unit = len(df_master)
         available_unit = len(df_master[df_master['Status_Code'] == 'AV'])
@@ -188,162 +187,135 @@ if menu == "Dashboard Overview":
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Unit Jobsite", f"{total_unit} Unit")
-        col2.metric("Available (AV)", f"{available_unit} Unit", delta=f"{(available_unit/total_unit)*100:.1f}%")
-        col3.metric("Off Hire (OH)", f"{off_hire_unit} Unit", delta=f"-{(off_hire_unit/total_unit)*100:.1f}%")
+        col2.metric("Available (AV)", f"{available_unit} Unit")
+        col3.metric("Off Hire (OH)", f"{off_hire_unit} Unit")
         col4.metric("Status Lainnya", f"{other_unit} Unit")
 
         st.markdown("---")
-        chart_col1, chart_col2 = st.columns(2)
-
-        with chart_col1:
+        c1, c2 = st.columns(2)
+        with c1:
             st.subheader("Distribusi Status Unit")
-            status_counts = df_master['Status_Description'].value_counts().reset_index()
-            status_counts.columns = ['Status', 'Jumlah']
-            fig_status = px.pie(status_counts, names='Status', values='Jumlah', hole=0.4, color_discrete_sequence=px.colors.qualitative.Set2)
-            st.plotly_chart(fig_status, use_container_width=True)
-
-        with chart_col2:
-            st.subheader("Top 10 Sebaran Project / Subcontractor")
-            site_counts = df_master['Project_Location'].value_counts().head(10).reset_index()
-            site_counts.columns = ['Project / Location', 'Jumlah Unit']
-            fig_site = px.bar(site_counts, x='Jumlah Unit', y='Project / Location', orientation='h', color='Jumlah Unit', color_continuous_scale='Blues')
-            fig_site.update_layout(yaxis={'categoryorder':'total ascending'})
-            st.plotly_chart(fig_site, use_container_width=True)
+            sc = df_master['Status_Description'].value_counts().reset_index()
+            sc.columns = ['Status', 'Jumlah']
+            st.plotly_chart(px.pie(sc, names='Status', values='Jumlah', hole=0.4), use_container_width=True)
+        with c2:
+            st.subheader("Top Sebaran Project / Lokasi")
+            loc = df_master['Project_Location'].value_counts().head(10).reset_index()
+            loc.columns = ['Lokasi', 'Jumlah']
+            st.plotly_chart(px.bar(loc, x='Jumlah', y='Lokasi', orientation='h'), use_container_width=True)
 
 # ------------------------------------------
-# MENU 2: MASTER DATA UNIT
+# 2. MASTER DATA UNIT
 # ------------------------------------------
 elif menu == "Master Data Unit":
-    st.title("Master Data Equipment Ellipse (Live)")
-    
+    st.title("Master Data Equipment (Live)")
     if df_master.empty:
-        st.warning("Data Master belum tersedia. Silakan upload file Excel MSE600 melalui menu di sidebar.")
+        st.warning("Data Master belum tersedia. Silakan upload file Excel MSE600.")
     else:
-        f_col1, f_col2 = st.columns(2)
-        with f_col1:
-            status_filter = st.multiselect("Filter Status Unit:", options=df_master['Status_Description'].unique(), default=df_master['Status_Description'].unique())
-        with f_col2:
-            search_query = st.text_input("Cari Unit No / Nama / Serial Number:")
-
-        filtered_df = df_master[df_master['Status_Description'].isin(status_filter)]
-        if search_query:
-            filtered_df = filtered_df[
-                filtered_df['Equipment_No'].str.contains(search_query, case=False) |
-                filtered_df['Equipment_Name'].str.contains(search_query, case=False) |
-                filtered_df['Serial_Number_Info'].str.contains(search_query, case=False)
+        search = st.text_input("Cari Unit No / Nama / Serial Number:")
+        filtered = df_master
+        if search:
+            filtered = df_master[
+                df_master['Equipment_No'].str.contains(search, case=False) |
+                df_master['Equipment_Name'].str.contains(search, case=False) |
+                df_master['Serial_Number_Info'].str.contains(search, case=False)
             ]
-
-        st.dataframe(filtered_df, use_container_width=True, height=450)
+        st.dataframe(filtered, use_container_width=True, height=450)
 
 # ------------------------------------------
-# MENU 3: UPLOAD / UPDATE MASTER MSE600
+# 3. UPLOAD MASTER MSE600
 # ------------------------------------------
 elif menu == "Upload / Update Master MSE600":
     st.title("Upload & Perbarui Master Data MSE600")
-    st.markdown("Pilih file Excel laporan Ellipse Anda untuk disimpan permanen ke dalam Google Sheets.")
+    uploaded_file = st.file_uploader("Pilih file Excel MSE600 (.xlsx)", type=["xlsx", "xls"])
     
-    uploaded_file = st.file_uploader("Upload Excel MSE600 (.xlsx)", type=["xlsx", "xls"])
     if uploaded_file is not None:
         if st.button("Simpan Master ke Cloud Permanen"):
             try:
                 df_raw_upload = pd.read_excel(uploaded_file, header=None)
-                rows_data = df_raw_upload.fillna("").values.tolist()
-                
                 payload = {
                     "action": "upload_master",
-                    "rows": rows_data
+                    "rows": df_raw_upload.fillna("").values.tolist()
                 }
-                webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
-                res = requests.post(webapp_url, json=payload)
+                res = requests.post(st.secrets["connections"]["gsheets"]["webapp_url"], json=payload)
                 if res.status_code == 200:
-                    st.success("Master MSE600 berhasil disimpan permanen di Cloud!")
+                    st.success("Master MSE600 berhasil disimpan permanen ke Google Sheets!")
                     st.cache_data.clear()
                     st.rerun()
                 else:
                     st.error("Gagal menyimpan ke cloud.")
             except Exception as e:
                 st.error(f"Error: {e}")
-
-    # Tambahan Debug View untuk melihat isi tabel MSE600 di Google Sheets
+                
     st.markdown("---")
-    if st.checkbox("🔍 Tampilkan Debug Data Mentah dari Google Sheets"):
+    if st.checkbox("🔍 Debug Lihat Data Mentah di Cloud"):
         conn = get_gsheets_connection()
         if conn:
             try:
-                raw_check = conn.read(worksheet="MSE600", ttl=0, header=None)
-                st.write(f"Total Baris di Tab MSE600: {len(raw_check)}")
-                st.dataframe(raw_check.head(10), use_container_width=True)
+                raw = conn.read(worksheet="MSE600", ttl=0, header=None)
+                st.write(f"Total Baris: {len(raw)}")
+                st.dataframe(raw.head(10), use_container_width=True)
             except Exception as e:
-                st.error(f"Gagal membaca tab MSE600: {e}")
+                st.error(f"Gagal baca: {e}")
 
 # ------------------------------------------
-# MENU 4: FORM MOBILISASI & DEMOBILISASI
+# 4. FORM MOB / DEMOB
 # ------------------------------------------
 elif menu == "Form Mob / Demob":
     st.title("Input Mobilisasi & Demobilisasi")
-    st.markdown("Setiap input transaksi akan mencatat log DAN memperbarui lokasi serta status unit di Master Cloud secara otomatis.")
-
     if df_master.empty:
-        st.warning("Data Master belum tersedia. Silakan upload ulang file Excel MSE600 di menu **Upload / Update Master MSE600**.")
+        st.warning("Data Master belum tersedia. Upload file Excel MSE600 terlebih dahulu.")
     else:
-        with st.form("form_mob_demob", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-
-            with col_a:
-                unit_selected = st.selectbox("Pilih Equipment No & Nama:", options=df_master['Equipment_No'] + " - " + df_master['Equipment_Name'])
-                jenis_aksi = st.selectbox("Jenis Transaksi:", ["MOBILISASI (MOB)", "DEMOBILISASI (DEMOB)"])
-                lokasi_asal = st.text_input("Lokasi Asal (Origin):")
-                
-            with col_b:
-                tanggal = st.date_input("Tanggal Pelaksanaan:", datetime.today())
-                pic = st.text_input("Nama PIC / Penanggung Jawab:", value=st.session_state.username)
-                lokasi_tujuan = st.text_input("Lokasi Tujuan (Destination):")
-
-            keterangan = st.text_area("Keterangan Catatan / Condition Report:")
-            submit_btn = st.form_submit_button("Simpan Permanen ke Cloud")
-
-            if submit_btn:
-                eq_no = unit_selected.split(" - ")[0]
-                eq_name = unit_selected.split(" - ")[1]
-                
+        with st.form("form_mob", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                unit_opt = st.selectbox("Pilih Unit:", options=df_master['Equipment_No'] + " - " + df_master['Equipment_Name'])
+                aksi = st.selectbox("Jenis Aksi:", ["MOBILISASI (MOB)", "DEMOBILISASI (DEMOB)"])
+                asal = st.text_input("Lokasi Asal:")
+            with col2:
+                tgl = st.date_input("Tanggal:", datetime.today())
+                pic = st.text_input("PIC:", value=st.session_state.username)
+                tujuan = st.text_input("Lokasi Tujuan:")
+            ket = st.text_area("Keterangan:")
+            
+            sub = st.form_submit_button("Simpan Log Transaksi")
+            if sub:
+                eq_no = unit_opt.split(" - ")[0]
+                eq_name = unit_opt.split(" - ")[1]
                 payload = {
                     "action": "mob_demob",
-                    'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'Tanggal_Transaksi': tanggal.strftime("%Y-%m-%d"),
-                    'Equipment_No': eq_no,
-                    'Nama_Unit': eq_name,
-                    'Jenis_Aksi': jenis_aksi,
-                    'Lokasi_Asal': lokasi_asal,
-                    'Lokasi_Tujuan': lokasi_tujuan,
-                    'Keterangan': keterangan,
-                    'PIC': pic
+                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Tanggal_Transaksi": tgl.strftime("%Y-%m-%d"),
+                    "Equipment_No": eq_no,
+                    "Nama_Unit": eq_name,
+                    "Jenis_Aksi": aksi,
+                    "Lokasi_Asal": asal,
+                    "Lokasi_Tujuan": tujuan,
+                    "Keterangan": ket,
+                    "PIC": pic
                 }
-
                 try:
-                    webapp_url = st.secrets["connections"]["gsheets"]["webapp_url"]
-                    response = requests.post(webapp_url, json=payload)
-                    if response.status_code == 200:
-                        st.success(f"Berhasil! Transaksi {jenis_aksi} unit {eq_no} tersimpan dan Master Cloud ter-update!")
+                    res = requests.post(st.secrets["connections"]["gsheets"]["webapp_url"], json=payload)
+                    if res.status_code == 200:
+                        st.success(f"Transaksi {aksi} untuk unit {eq_no} berhasil dicatat permanen!")
                         st.cache_data.clear()
                         st.rerun()
                     else:
-                        st.error(f"Gagal mengirim data. Code: {response.status_code}")
-                except Exception as err:
-                    st.error(f"Terjadi kesalahan koneksi: {err}")
+                        st.error("Gagal mencatat transaksi.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
 # ------------------------------------------
-# MENU 5: LOG TRANSAKSI PERMANEN
+# 5. LOG TRANSAKSI PERMANEN
 # ------------------------------------------
 elif menu == "Log Transaksi Permanen":
-    st.title("Log Transaksi Real-Time (Google Sheets)")
-    
+    st.title("Log Transaksi Real-Time")
     conn = get_gsheets_connection()
     if conn:
         try:
             db_data = conn.read(worksheet="Log_Trans", ttl=0)
             st.dataframe(db_data, use_container_width=True)
-            
             csv = db_data.to_csv(index=False).encode('utf-8')
-            st.download_button("Export Log Database (CSV)", csv, "log_database_mob_demob.csv", "text/csv")
-        except:
-            st.info("Belum ada transaksi di tab Log_Trans.")
+            st.download_button("Export CSV", csv, "log_mob_demob.csv", "text/csv")
+        except Exception:
+            st.info("Belum ada data transaksi tercatat.")
