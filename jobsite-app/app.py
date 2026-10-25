@@ -34,7 +34,7 @@ if "username" not in st.session_state:
 def get_gsheets_connection():
     try:
         return st.connection("gsheets", type=GSheetsConnection)
-    except:
+    except Exception as e:
         return None
 
 # ==========================================
@@ -99,67 +99,48 @@ if not st.session_state.logged_in:
     st.stop()
 
 # ==========================================
-# PARSER DATA MASTER YANG AMAN & BERSIH
+# PARSER MASTER DENGAN DEBUG TRANSPARAN
 # ==========================================
 @st.cache_data
 def load_master_from_cloud():
     conn = get_gsheets_connection()
     if not conn:
-        return pd.DataFrame()
+        return pd.DataFrame(), "Koneksi GSheets gagal diinisialisasi (Cek Streamlit Secrets)."
     try:
+        # Membaca tanpa header agar seluruh baris terbaca utuh
         df_raw = conn.read(worksheet="MSE600", ttl=0, header=None)
         if df_raw.empty:
-            return pd.DataFrame()
+            return pd.DataFrame(), "Tab MSE600 di Google Sheets kosong."
         
-        # Deteksi baris header secara aman tanpa nested ternary
-        header_idx = 0
-        for idx in range(min(10, len(df_raw))):
-            row_vals = [str(x).lower() for x in df_raw.iloc[idx].values]
-            joined = " ".join(row_vals)
-            if "equip" in joined or "unit" in joined:
-                header_idx = idx
-                break
-        
-        df_cleaned = df_raw.iloc[header_idx + 1:].copy() if header_idx < len(df_raw) - 1 else df_raw.copy()
-        df_cleaned = df_cleaned.reset_index(drop=True)
-        
-        if df_cleaned.empty:
-            return pd.DataFrame()
-            
+        df_cleaned = df_raw.copy().reset_index(drop=True)
         ncols = df_cleaned.shape[1]
         
-        def get_column(idx, default_val=""):
+        def get_col(idx):
             if ncols > idx:
                 return df_cleaned.iloc[:, idx].astype(str).str.strip()
-            return pd.Series([default_val] * len(df_cleaned))
-            
-        eq_no = get_column(0)
-        eq_name = get_column(2) if ncols > 2 else get_column(1)
-        stat_code = get_column(3, "AV")
-        stat_desc = get_column(4, "Available")
-        proj_loc = get_column(8) if ncols > 8 else get_column(5)
-        serial_info = get_column(11) if ncols > 11 else get_column(6)
+            return pd.Series([""] * len(df_cleaned))
         
         result_df = pd.DataFrame({
-            'Equipment_No': eq_no,
-            'Equipment_Name': eq_name,
-            'Status_Code': stat_code,
-            'Status_Description': stat_desc,
-            'Project_Location': proj_loc,
-            'Serial_Number_Info': serial_info
+            'Equipment_No': get_col(0),
+            'Equipment_Name': get_col(2) if ncols > 2 else get_col(1),
+            'Status_Code': get_col(3),
+            'Status_Description': get_col(4),
+            'Project_Location': get_col(8) if ncols > 8 else get_col(5),
+            'Serial_Number_Info': get_col(11) if ncols > 11 else get_col(6)
         })
         
+        # Buang baris kosong
         result_df = result_df[
             (result_df['Equipment_No'] != '') & 
             (result_df['Equipment_No'].str.lower() != 'nan') & 
-            (result_df['Equipment_No'].str.lower() != 'none') &
-            (~result_df['Equipment_No'].str.lower().str.contains('equipment|equip|no'))
+            (result_df['Equipment_No'].str.lower() != 'none')
         ]
-        return result_df
+        
+        return result_df, None
     except Exception as e:
-        return pd.DataFrame()
+        return pd.DataFrame(), str(e)
 
-df_master = load_master_from_cloud()
+df_master, cloud_error = load_master_from_cloud()
 
 # ==========================================
 # SIDEBAR NAVIGATION
@@ -196,11 +177,14 @@ if menu == "Dashboard Overview":
     st.markdown("---")
 
     if df_master.empty:
-        st.warning("Belum ada Data Master MSE600 di Google Sheets. Silakan upload file Excel master Anda melalui menu Upload / Update Master MSE600 di sidebar.")
+        st.warning("⚠️ Belum ada Data Master MSE600 di Google Sheets atau gagal dimuat.")
+        if cloud_error:
+            st.error(f"Detail Error dari Cloud: {cloud_error}")
+        st.info("Silakan buka menu **Upload / Update Master MSE600** di sidebar untuk mengunggah file Excel Anda.")
     else:
         total_unit = len(df_master)
-        available_unit = len(df_master[df_master['Status_Code'] == 'AV'])
-        off_hire_unit = len(df_master[df_master['Status_Code'] == 'OH'])
+        available_unit = len(df_master[df_master['Status_Code'].str.upper() == 'AV'])
+        off_hire_unit = len(df_master[df_master['Status_Code'].str.upper() == 'OH'])
         other_unit = total_unit - (available_unit + off_hire_unit)
 
         col1, col2, col3, col4 = st.columns(4)
@@ -228,7 +212,9 @@ if menu == "Dashboard Overview":
 elif menu == "Master Data Unit":
     st.title("Master Data Equipment (Live)")
     if df_master.empty:
-        st.warning("Data Master belum tersedia. Silakan upload file Excel MSE600.")
+        st.warning("Data Master belum tersedia.")
+        if cloud_error:
+            st.error(f"Detail Error: {cloud_error}")
     else:
         search = st.text_input("Cari Unit No / Nama / Serial Number:")
         filtered = df_master
@@ -245,6 +231,10 @@ elif menu == "Master Data Unit":
 # ------------------------------------------
 elif menu == "Upload / Update Master MSE600":
     st.title("Upload & Perbarui Master Data MSE600")
+    
+    if cloud_error:
+        st.error(f"Status Koneksi/Pembacaan Saat Ini: {cloud_error}")
+        
     uploaded_file = st.file_uploader("Pilih file Excel MSE600 (.xlsx)", type=["xlsx", "xls"])
     
     if uploaded_file is not None:
@@ -263,18 +253,18 @@ elif menu == "Upload / Update Master MSE600":
                 else:
                     st.error("Gagal menyimpan ke cloud.")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error Upload: {e}")
                 
     st.markdown("---")
-    if st.checkbox("Debug Lihat Data Mentah di Cloud"):
+    if st.checkbox("🔍 Debug Lihat Data Mentah di Cloud"):
         conn = get_gsheets_connection()
         if conn:
             try:
                 raw = conn.read(worksheet="MSE600", ttl=0, header=None)
-                st.write(f"Total Baris: {len(raw)}")
-                st.dataframe(raw.head(10), use_container_width=True)
+                st.write(f"Total Baris Terbaca dari Cloud: {len(raw)}")
+                st.dataframe(raw.head(15), use_container_width=True)
             except Exception as e:
-                st.error(f"Gagal baca: {e}")
+                st.error(f"Gagal baca mentah: {e}")
 
 # ------------------------------------------
 # 4. FORM MOB / DEMOB
