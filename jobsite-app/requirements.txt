@@ -1,6 +1,6 @@
-streamlit
-pandas
+streamlit>=1.32.0
+pandas>=1.5.3
 plotly
 requests
-streamlit-gsheets
+st-gsheets-connection==0.1.0
 openpyxl
