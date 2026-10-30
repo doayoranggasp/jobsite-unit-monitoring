@@ -1,6 +1,5 @@
 streamlit
 pandas
-plotly
 requests
-streamlit-gsheets
-openpyxl
+gspread
+google-auth
