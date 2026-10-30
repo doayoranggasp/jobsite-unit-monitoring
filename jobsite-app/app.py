@@ -10,8 +10,8 @@ from streamlit_gsheets import GSheetsConnection
 # CONFIGURATION
 # =========================================================
 st.set_page_config(
-    page_title="KPP INDE-ALL UNIT",
-    page_icon="LOGO KPP COLOR_50 PNG.png",
+    page_title="Jobsite Fleet Management System",
+    page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -19,87 +19,18 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    :root { --jf-bg:#07111f; --jf-panel:rgba(14,29,49,.86); --jf-line:rgba(80,190,255,.24); --jf-cyan:#43d9ff; --jf-blue:#397bff; }
-    .stApp { background: radial-gradient(ellipse at 10% 0%, #102d4b 0%, #081525 38%, #050b14 100%); color:#e8f4ff; }
-    [data-testid="stHeader"] { background:rgba(4,12,22,.78); }
-    [data-testid="stSidebar"] { background:linear-gradient(180deg,#071526 0%,#0a1d31 100%); border-right:1px solid var(--jf-line); }
-    [data-testid="stSidebar"] * { color:#e8f4ff; }
-    h1,h2,h3 { color:#f3faff !important; letter-spacing:.2px; }
-    [data-testid="stMetric"] { background:linear-gradient(145deg,rgba(18,43,68,.95),rgba(8,20,36,.92)); border:1px solid var(--jf-line); padding:16px; border-radius:16px; box-shadow:0 8px 28px rgba(0,0,0,.18); }
-    [data-testid="stMetricValue"] { color:var(--jf-cyan); }
-    .stButton > button, .stFormSubmitButton > button { width:100%; background:linear-gradient(100deg,#0878c9,#315bff); color:white; border:1px solid rgba(100,220,255,.4); border-radius:10px; font-weight:700; transition:all .2s ease; }
-    .stButton > button:hover, .stFormSubmitButton > button:hover { border-color:#70e5ff; box-shadow:0 0 18px rgba(67,217,255,.24); transform:translateY(-1px); }
-    [data-testid="stDataFrame"], [data-testid="stTable"] { border:1px solid var(--jf-line); border-radius:12px; overflow:hidden; }
-    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div, textarea { background:rgba(6,18,32,.88) !important; }
-    .jf-hero { padding:22px 26px; margin:4px 0 22px; border:1px solid rgba(67,217,255,.32); border-radius:18px; background:linear-gradient(115deg,rgba(14,54,83,.92),rgba(13,25,52,.84)); box-shadow:0 12px 34px rgba(0,0,0,.22); }
-    .jf-kicker { color:#69e4ff; font-size:12px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
-    .jf-title { font-size:clamp(24px,3vw,38px); font-weight:850; margin:5px 0; color:#f4fbff; }
-    .jf-subtitle { color:#a9c7df; font-size:14px; }
-
-    /* Premium navigation / enterprise sidebar */
-    [data-testid="stSidebar"] > div:first-child { padding-top: 1.25rem; }
-    [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: .65rem; }
-    [data-testid="stSidebar"] .stRadio > label { color:#7ddfff !important; font-size:11px !important; font-weight:800 !important; letter-spacing:1.7px !important; text-transform:uppercase; margin: 12px 0 8px; }
-    [data-testid="stSidebar"] div[role="radiogroup"] { gap:7px; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label {
-        display:flex; align-items:center; min-height:42px; padding:10px 12px !important;
-        border:1px solid rgba(110,180,220,.12); border-radius:12px;
-        background:linear-gradient(110deg,rgba(13,34,56,.72),rgba(8,22,39,.52));
-        transition:all .18s ease; margin:0 !important;
+    .main { background-color: #f8f9fa; }
+    .stButton > button {
+        width: 100%;
+        background-color: #007bff;
+        color: white;
+        border-radius: 8px;
+        font-weight: bold;
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
-        border-color:rgba(67,217,255,.55); background:rgba(20,59,87,.8); transform:translateX(2px);
-    }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:has(input:checked) {
-        border-color:rgba(67,217,255,.75); background:linear-gradient(100deg,rgba(10,120,201,.34),rgba(49,91,255,.19));
-        box-shadow:inset 3px 0 0 #43d9ff, 0 5px 18px rgba(0,0,0,.12);
-    }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size:13px; font-weight:650; color:#dceeff; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child { display:none; }
-    .jf-brand-card { padding:18px 15px; margin:4px 0 14px; border:1px solid rgba(67,217,255,.28); border-radius:16px; background:linear-gradient(145deg,rgba(17,57,86,.92),rgba(7,19,35,.96)); box-shadow:0 10px 28px rgba(0,0,0,.2); }
-    .jf-brand-mark { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#43d9ff,#397bff); color:#031323; font-weight:950; margin-bottom:10px; box-shadow:0 0 20px rgba(67,217,255,.2); }
-    .jf-brand-name { font-size:19px; line-height:1.08; font-weight:900; letter-spacing:.4px; color:#f4fbff; }
-    .jf-brand-caption { color:#8bb6d5; font-size:10px; letter-spacing:1.5px; margin-top:8px; text-transform:uppercase; }
-    .jf-user-chip { border:1px solid rgba(67,217,255,.2); background:rgba(8,24,42,.7); padding:10px 12px; border-radius:12px; color:#b9d8ee; font-size:12px; }
-    .jf-section-label { color:#69e4ff; font-size:10px; letter-spacing:1.8px; font-weight:850; text-transform:uppercase; margin:12px 0 6px; }
-    .jf-hero { position:relative; overflow:hidden; }
-    .jf-hero:after { content:""; position:absolute; width:210px; height:210px; right:-75px; top:-95px; border:1px solid rgba(67,217,255,.22); border-radius:50%; box-shadow:0 0 0 22px rgba(67,217,255,.035),0 0 0 48px rgba(67,217,255,.025); pointer-events:none; }
-
-    /* High-contrast readability fixes for Streamlit widgets */
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] { color:#f3f7fc !important; }
-    [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p,
-    [data-testid="stMarkdownContainer"] li, [data-testid="stCaptionContainer"],
-    .stText, label, .stCheckbox label, .stRadio label, .stSelectbox label,
-    .stMultiSelect label, .stTextInput label, .stNumberInput label,
-    .stDateInput label, .stTimeInput label, .stFileUploader label { color:#e8eef7 !important; }
-    input, textarea, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea,
-    [data-baseweb="select"] *, [data-baseweb="tag"] { color:#f8fafc !important; -webkit-text-fill-color:#f8fafc !important; }
-    div[data-baseweb="input"] > div, div[data-baseweb="textarea"] > div,
-    div[data-baseweb="select"] > div, [data-testid="stDateInput"] input,
-    [data-testid="stNumberInput"] input, [data-testid="stTextInput"] input,
-    [data-testid="stTextArea"] textarea {
-        background:#172334 !important; border-color:#52657b !important; color:#f8fafc !important;
-    }
-    input::placeholder, textarea::placeholder { color:#b8c5d5 !important; -webkit-text-fill-color:#b8c5d5 !important; opacity:1 !important; }
-    [data-baseweb="popover"], [data-baseweb="menu"], ul[role="listbox"],
-    li[role="option"], [data-baseweb="select"] [role="option"] {
-        background:#172334 !important; color:#f8fafc !important;
-    }
-    li[role="option"]:hover, [role="option'][aria-selected="true"] { background:#254365 !important; color:#ffffff !important; }
-    [data-testid="stDataFrame"], [data-testid="stTable"] { color:#f8fafc !important; }
-    [data-testid="stAlert"] p { color:inherit !important; }
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] small { color:#edf6ff !important; }
-    .stButton > button, .stFormSubmitButton > button { color:#ffffff !important; }
-    @media (prefers-color-scheme: light) {
-        input, textarea, [data-baseweb="select"] *, [data-baseweb="tag"] { color:#f8fafc !important; }
-    }
-    @media (max-width: 768px) { .jf-brand-name { font-size:17px; } .jf-hero { padding:18px; } }
     </style>
     """,
     unsafe_allow_html=True,
 )
-
 
 # =========================================================
 # SESSION STATE
@@ -108,18 +39,8 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
     st.session_state.username = ""
-if "company_logo_bytes" not in st.session_state:
-    st.session_state.company_logo_bytes = None
-if "background_bytes" not in st.session_state:
-    st.session_state.background_bytes = None
-
-# Uploaded branding is held in the active Streamlit session (not persisted to Google Sheets).
-import base64
-_logo = st.session_state.company_logo_bytes
-_bg = st.session_state.background_bytes
-if _bg:
-    _bg64 = base64.b64encode(_bg).decode("ascii")
-    st.markdown(f"<style>.stApp {{ background-image:linear-gradient(rgba(4,12,24,.84),rgba(4,12,24,.91)),url('data:image/jpeg;base64,{_bg64}'); background-size:cover; background-position:center; background-attachment:fixed; }}</style>", unsafe_allow_html=True)
+if "user_role" not in st.session_state:
+    st.session_state.user_role = "Operator"
 
 
 # =========================================================
@@ -220,46 +141,6 @@ def get_worksheet_id(key):
         ) from exc
 
 
-def normalize_log_columns(frame):
-    """Normalize Log_Trans headers so minor spacing/case/underscore differences do not break monitoring."""
-    if frame is None:
-        return pd.DataFrame()
-    frame = frame.copy()
-    def key(value):
-        return " ".join(str(value).replace("\ufeff", "").strip().lower().replace("_", " ").replace("-", " ").split())
-    aliases = {
-        "Timestamp": ["timestamp", "time stamp", "waktu input"],
-        "Tanggal_Transaksi": ["tanggal transaksi", "tanggal", "transaction date"],
-        "Equipment_No": ["equipment no", "equipment number", "equipment", "nomor unit", "no unit"],
-        "Nama_Unit": ["nama unit", "unit name"],
-        "Jenis_Aksi": ["jenis aksi", "jenis transaksi", "action type", "aksi", "jenis action"],
-        "Lokasi_Asal": ["lokasi asal", "asal", "origin", "from location"],
-        "Lokasi_Tujuan": ["lokasi tujuan", "tujuan", "destination", "to location"],
-        "Keterangan": ["keterangan", "remarks", "notes"],
-        "PIC": ["pic", "person in charge", "operator"],
-        "Request_ID": ["request id", "requestid", "id request", "transaction id"],
-        "Process_Status": ["process status", "status proses", "status transaksi", "status"],
-        "Closed_Timestamp": ["closed timestamp", "waktu close", "tanggal close", "closed at"],
-        "Closed_By": ["closed by", "ditutup oleh", "username penutup"],
-        "Manifest_Number": ["manifest number", "nomor manifest", "no manifest", "manifest no", "manifest"],
-    }
-    reverse = {key(alias): canonical for canonical, names in aliases.items() for alias in names}
-    rename = {}
-    for col in frame.columns:
-        normalized = key(col)
-        if normalized in reverse:
-            rename[col] = reverse[normalized]
-    frame = frame.rename(columns=rename)
-    # If duplicate headers map to the same canonical field, keep the first non-empty value.
-    if frame.columns.duplicated().any():
-        result = pd.DataFrame(index=frame.index)
-        for col in dict.fromkeys(frame.columns):
-            same = frame.loc[:, frame.columns == col]
-            result[col] = same.bfill(axis=1).iloc[:, 0] if same.shape[1] > 1 else same.iloc[:, 0]
-        frame = result
-    return frame
-
-
 def clean_text_series(series):
     """Konversi kolom menjadi teks tanpa nilai NaN/None."""
     return (
@@ -274,7 +155,7 @@ def clean_text_series(series):
 # LOGIN / REGISTER
 # =========================================================
 if not st.session_state.logged_in:
-    st.title("Login & Register - KPP INDE")
+    st.title("Login & Register - Jobsite Fleet System")
     st.markdown("Silakan masuk menggunakan akun terdaftar atau buat akun baru.")
 
     tab_login, tab_reg = st.tabs(["Login", "Register Akun Baru"])
@@ -298,6 +179,7 @@ if not st.session_state.logged_in:
                     if api_success(result):
                         st.session_state.logged_in = True
                         st.session_state.username = l_user
+                        st.session_state.user_role = str(result.get("role", "Operator"))
                         st.success("Login berhasil.")
                         st.rerun()
                     else:
@@ -391,7 +273,7 @@ def load_master_from_cloud():
     equipment_idx = find_col(["equipment no", "equip no", "equipment", "unit no"], 0)
     name_idx = find_col(["equipment name", "unit name", "description"], 2 if ncols > 2 else 1)
     status_idx = find_col(["status code", "status"], 3)
-    status_desc_idx = find_col(["equipment status description", "status description", "status desc"], 4)
+    status_desc_idx = find_col(["status description", "status desc"], 4)
     location_idx = find_col(["project location", "location", "project"], 8 if ncols > 8 else 5)
     serial_idx = find_col(["serial number", "serial no", "serial"], 11 if ncols > 11 else 6)
 
@@ -435,101 +317,43 @@ except Exception as exc:
 # =========================================================
 # SIDEBAR NAVIGATION
 # =========================================================
-if st.session_state.company_logo_bytes:
-    st.sidebar.image(st.session_state.company_logo_bytes, use_container_width=True)
-st.sidebar.markdown("<div class='jf-brand-card'><div class='jf-brand-mark'>KPP</div><div class='jf-brand-name'>KPP INDE<br>@2026</div><div class='jf-brand-caption'>MONITORING UNIT KPP</div></div>", unsafe_allow_html=True)
-st.sidebar.markdown(f"<div class='jf-user-chip'>● &nbsp; Signed in as <b>{st.session_state.username}</b></div>", unsafe_allow_html=True)
+st.sidebar.title("Jobsite Fleet System")
+role = str(st.session_state.get("user_role", "Operator")).strip().lower()
+is_supervisor = role in ["supervisor", "admin", "warehouse supervisor"]
+st.sidebar.info(f"User: {st.session_state.username}\nRole: {st.session_state.user_role}")
 
-menu = st.sidebar.radio(
-    "Workspace Navigation",
-    [
-        "Dashboard Overview",
-        "Master Jobsite",
-        "Master Data Unit",
-        "Upload / Update Master MSE600",
-        "Form Mob / Demob",
-        "Log Transaksi Permanen",
-        "Pengaturan Tampilan",
-        "Tutup Proses DEMOB",
-    ],
-)
+unit_pages = ["Dashboard Overview", "Master Jobsite", "Master Data Unit", "Upload / Update Master MSE600", "Form Mob / Demob", "Log Transaksi Permanen"]
+warehouse_pages = ["Submit Bank Problem", "My Problem Tickets"]
+if is_supervisor:
+    warehouse_pages = ["Bank Problem Dashboard", "All Problem Tickets", "Master Kategori Problem", "Problem Analysis"]
 
-st.sidebar.markdown("<div class='jf-section-label'>System Actions</div>", unsafe_allow_html=True)
+st.sidebar.markdown("### UNIT MANAGEMENT")
+unit_menu = st.sidebar.radio("Unit Management", unit_pages, key="unit_navigation")
+st.sidebar.markdown("### WAREHOUSE MANAGEMENT")
+warehouse_menu = st.sidebar.radio("Warehouse Management", warehouse_pages, key="warehouse_navigation")
+menu = warehouse_menu if warehouse_menu in warehouse_pages and st.session_state.get("active_module") == "warehouse" else unit_menu
+module = st.sidebar.radio("Pilih Modul", ["Unit Management", "Warehouse Management"], horizontal=True, key="active_module_choice")
+menu = warehouse_menu if module == "Warehouse Management" else unit_menu
 
-if st.sidebar.button("↻  Refresh Data Real-Time"):
+st.sidebar.markdown("---")
+
+if st.sidebar.button("Refresh Data Real-Time"):
     st.cache_data.clear()
     st.rerun()
 
-if st.sidebar.button("⇥  Logout"):
+if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
     st.session_state.username = ""
+    st.session_state.user_role = "Operator"
     st.rerun()
 
 
 # =========================================================
 # 1. DASHBOARD OVERVIEW
 # =========================================================
-st.markdown("<div class='jf-hero'><div class='jf-kicker'>KPP INDE</div><div class='jf-title'>MONITORING UNIT KPP INDE</div><div class='jf-subtitle'></div></div>", unsafe_allow_html=True)
 if menu == "Dashboard Overview":
-    st.title("Dashboard Unit KPP INDE")
-    st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Equipment Status Description.")
-
-    # DEMOB OPEN/CLOSE monitoring from permanent Log_Trans sheet.
-    st.markdown("### Monitoring Proses DEMOB")
-    log_df = pd.DataFrame()
-    log_read_error = None
-    try:
-        log_conn = get_gsheets_connection()
-        if log_conn is not None:
-            log_df = log_conn.read(worksheet=get_worksheet_id("log_trans_gid"), ttl=0)
-            log_df = normalize_log_columns(log_df)
-            if log_df is None:
-                log_df = pd.DataFrame()
-    except Exception as exc:
-        log_read_error = str(exc)
-        log_df = pd.DataFrame()
-
-    if log_read_error:
-        st.warning(f"Data monitoring DEMOB belum dapat dibaca dari Log_Trans: {log_read_error}")
-    elif log_df.empty:
-        st.info("Belum ada transaksi untuk monitoring DEMOB.")
-    else:
-        # Be tolerant of historical rows where the new status columns did not exist.
-        for col in ["Jenis_Aksi", "Process_Status", "Manifest_Number", "Closed_Timestamp", "Closed_By", "Tanggal_Transaksi", "Equipment_No", "Nama_Unit", "Lokasi_Asal", "Lokasi_Tujuan", "PIC", "Request_ID"]:
-            if col not in log_df.columns:
-                log_df[col] = ""
-        demob_df = log_df[log_df["Jenis_Aksi"].fillna("").astype(str).str.strip().str.upper().str.contains("DEMOB", na=False)].copy()
-        demob_df["Process_Status"] = demob_df["Process_Status"].fillna("").astype(str).str.strip().str.upper()
-        demob_df.loc[demob_df["Process_Status"] == "", "Process_Status"] = "OPEN"
-        demob_df["Manifest_Number"] = demob_df["Manifest_Number"].fillna("").astype(str).str.strip()
-        demob_df.loc[demob_df["Process_Status"].isin(["CLOSED", "COMPLETE", "COMPLETED"]), "Process_Status"] = "CLOSE"
-        open_df = demob_df[demob_df["Process_Status"] == "OPEN"]
-        close_df = demob_df[demob_df["Process_Status"] == "CLOSE"]
-        other_df = demob_df[~demob_df["Process_Status"].isin(["OPEN", "CLOSE"])]
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total DEMOB", f"{len(demob_df):,}")
-        m2.metric("OPEN", f"{len(open_df):,}")
-        m3.metric("CLOSE", f"{len(close_df):,}")
-        m4.metric("OPEN tanpa Manifest", f"{int((open_df['Manifest_Number'] == '').sum()):,}")
-
-        f_status, f_search = st.columns([1, 2])
-        with f_status:
-            demob_status_filter = st.multiselect("Filter Status Proses", ["OPEN", "CLOSE"], default=["OPEN", "CLOSE"], key="dashboard_demob_status")
-        with f_search:
-            demob_search = st.text_input("Cari DEMOB (unit / manifest / PIC / request ID)", key="dashboard_demob_search")
-        shown_demob = demob_df[demob_df["Process_Status"].isin(demob_status_filter)].copy() if demob_status_filter else demob_df.iloc[0:0].copy()
-        if demob_search.strip():
-            term = demob_search.strip()
-            search_cols = ["Equipment_No", "Nama_Unit", "Manifest_Number", "PIC", "Request_ID", "Lokasi_Asal", "Lokasi_Tujuan"]
-            mask = pd.Series(False, index=shown_demob.index)
-            for col in search_cols:
-                mask |= shown_demob[col].fillna("").astype(str).str.contains(term, case=False, regex=False, na=False)
-            shown_demob = shown_demob[mask]
-        display_cols = ["Tanggal_Transaksi", "Equipment_No", "Nama_Unit", "Lokasi_Asal", "Lokasi_Tujuan", "PIC", "Process_Status", "Manifest_Number", "Closed_Timestamp", "Closed_By", "Request_ID"]
-        st.dataframe(shown_demob[display_cols], use_container_width=True, hide_index=True)
-        if not other_df.empty:
-            st.caption(f"Catatan: {len(other_df)} baris DEMOB memiliki status selain OPEN/CLOSE dan tidak masuk hitungan utama.")
-        st.markdown("---")
+    st.title("Dashboard Fleet & Operational Overview")
+    st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Status_Description.")
 
     if df_master.empty:
         st.warning("Data Master MSE600 belum tersedia atau gagal dibaca. Periksa tab MSE600 dan konfigurasi Google Sheets.")
@@ -751,7 +575,7 @@ elif menu == "Upload / Update Master MSE600":
 # =========================================================
 elif menu == "Form Mob / Demob":
     st.title("Form Mobilisasi & Demobilisasi")
-    st.info("Saat transaksi berhasil, sistem mencatat log dan memperbarui Equipment Status Description serta Project_Location pada Master MSE600.")
+    st.info("Saat transaksi berhasil, sistem mencatat log dan memperbarui Status_Description serta Project_Location pada Master MSE600.")
 
     if df_master.empty:
         st.warning("Data Master MSE600 belum tersedia. Upload file master terlebih dahulu.")
@@ -829,7 +653,7 @@ elif menu == "Form Mob / Demob":
                             if api_success(result):
                                 st.success(result.get("message", "Transaksi tersimpan dan master unit diperbarui."))
                                 if result.get("master_updated"):
-                                    st.success(f"Master MSE600 diperbarui: Equipment Status Description = {result.get('new_status_description', aksi)}; Project_Location = {tujuan}.")
+                                    st.success(f"Master MSE600 diperbarui: Status_Description = {result.get('new_status_description', aksi)}; Project_Location = {tujuan}.")
                                 else:
                                     st.warning("Log tersimpan, tetapi backend tidak mengonfirmasi pembaruan master. Periksa tab MSE600.")
                                 st.cache_data.clear()
@@ -874,89 +698,121 @@ elif menu == "Log Transaksi Permanen":
 
 
 # =========================================================
-# 6. SETTINGS: COMPANY BRANDING
+# WAREHOUSE MANAGEMENT - BANK PROBLEM TICKETING
 # =========================================================
-elif menu == "Pengaturan Tampilan":
-    st.title("Pengaturan Tampilan")
-    st.markdown("Unggah identitas visual agar dashboard terasa lebih sesuai dengan perusahaan.")
-    st.warning("Logo dan background yang diunggah di sini tersimpan pada sesi browser Streamlit saat ini saja. Untuk permanen bagi semua pengguna, simpan aset di hosting/Google Drive dan konfigurasi URL tetap.")
-    col_logo, col_bg = st.columns(2)
-    with col_logo:
-        st.subheader("Logo Perusahaan")
-        logo_file = st.file_uploader("Upload logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="branding_logo_upload")
-        if logo_file:
-            st.session_state.company_logo_bytes = logo_file.getvalue()
-        if st.session_state.company_logo_bytes:
-            st.image(st.session_state.company_logo_bytes, caption="Preview logo", width=220)
-            if st.button("Hapus logo dari sesi", key="clear_logo"):
-                st.session_state.company_logo_bytes = None
-                st.rerun()
-    with col_bg:
-        st.subheader("Background Dashboard")
-        bg_file = st.file_uploader("Upload background (JPG/PNG)", type=["png", "jpg", "jpeg"], key="branding_bg_upload")
-        if bg_file:
-            st.session_state.background_bytes = bg_file.getvalue()
-        if st.session_state.background_bytes:
-            st.image(st.session_state.background_bytes, caption="Preview background", use_container_width=True)
-            if st.button("Hapus background dari sesi", key="clear_bg"):
-                st.session_state.background_bytes = None
-                st.rerun()
-    st.caption("Saran: gunakan logo PNG transparan dan background landscape dengan kontras rendah agar teks tetap terbaca.")
+def bank_api(action, **kwargs):
+    return post_to_webapp({"action": action, "username": st.session_state.username, "user_role": st.session_state.user_role, **kwargs})
 
-# =========================================================
-# 7. CLOSE DEMOB PROCESS
-# =========================================================
-elif menu == "Tutup Proses DEMOB":
-    st.title("Tutup Proses DEMOB")
-    st.caption("Tutup transaksi DEMOB setelah unit dan dokumen sudah diverifikasi selesai. Tindakan ini mencatat waktu penutupan dan username PIC.")
-    conn = get_gsheets_connection()
-    if conn is None:
-        st.error("Koneksi Google Sheets tidak tersedia untuk membaca transaksi.")
-    else:
-        try:
-            logs = conn.read(worksheet=get_worksheet_id("log_trans_gid"), ttl=0)
-            logs = normalize_log_columns(logs)
-            if logs is None or logs.empty:
-                st.info("Belum ada transaksi.")
-            else:
-                # Create missing optional fields safely; fail clearly only if action type is truly absent.
-                for optional_col in ["Process_Status", "Manifest_Number", "Closed_Timestamp", "Closed_By", "Request_ID", "Tanggal_Transaksi", "Equipment_No", "Nama_Unit", "Lokasi_Asal", "Lokasi_Tujuan", "PIC"]:
-                    if optional_col not in logs.columns:
-                        logs[optional_col] = ""
-                if "Jenis_Aksi" not in logs.columns:
-                    st.error("Kolom jenis transaksi tidak dikenali. Header yang terbaca: " + ", ".join(map(str, logs.columns)))
-                    st.stop()
-                logs["Process_Status"] = logs["Process_Status"].fillna("").astype(str).str.strip().str.upper()
-                demobs = logs[logs["Jenis_Aksi"].astype(str).str.contains("DEMOB", case=False, na=False)].copy()
-                demobs.loc[demobs["Process_Status"] == "", "Process_Status"] = "OPEN"
-                open_demobs = demobs[demobs["Process_Status"] == "OPEN"]
-                m1,m2,m3 = st.columns(3)
-                m1.metric("Total DEMOB", len(demobs))
-                m2.metric("OPEN", len(open_demobs))
-                m3.metric("CLOSE", int((demobs["Process_Status"] == "CLOSE").sum()))
-                if open_demobs.empty:
-                    st.success("Tidak ada proses DEMOB berstatus OPEN.")
+def load_problem_categories():
+    r = bank_api("get_problem_categories")
+    if not api_success(r): raise RuntimeError(r.get("message", "Gagal memuat kategori"))
+    return r.get("categories", [])
+
+def load_problem_tickets(own_only=False):
+    r = bank_api("get_problem_tickets", own_only=own_only)
+    if not api_success(r): raise RuntimeError(r.get("message", "Gagal memuat tiket"))
+    return pd.DataFrame(r.get("tickets", []))
+
+if menu == "Submit Bank Problem":
+    st.title("🧰 Submit Warehouse Problem")
+    st.caption("Laporkan kendala inventory / warehouse. Tiket akan diteruskan ke Warehouse Supervisor.")
+    try:
+        categories = load_problem_categories()
+        active_categories = [x["category"] for x in categories if str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"]]
+    except Exception as exc:
+        active_categories = []
+        st.error(f"Kategori gagal dimuat: {exc}")
+    with st.form("bank_problem_submit", clear_on_submit=True):
+        a,b = st.columns(2)
+        with a: wr = st.text_input("1. WR", placeholder="Masukkan nomor Work Request")
+        with b: stockcode = st.text_input("2. Stockcode (angka)", placeholder="Contoh: 12345678")
+        c,d = st.columns(2)
+        with c: qty_fisik = st.number_input("3. Qty Fisik", min_value=0.0, step=1.0)
+        with d: qty_ellipse = st.number_input("4. Qty Ellipse", min_value=0.0, step=1.0)
+        category = st.selectbox("5. Kategori Problem", active_categories if active_categories else ["Kategori belum tersedia"])
+        description = st.text_area("6. Uraian Problem", height=150, placeholder="Jelaskan kondisi, kronologi, lokasi/bin, dan dampak problem...")
+        submit = st.form_submit_button("Kirim Problem Ticket", type="primary", use_container_width=True)
+    if submit:
+        if not wr.strip() or not stockcode.strip() or not description.strip(): st.warning("WR, Stockcode, dan Uraian Problem wajib diisi.")
+        elif not stockcode.strip().isdigit(): st.warning("Stockcode harus berupa angka.")
+        elif not active_categories: st.warning("Master kategori belum tersedia. Hubungi Supervisor.")
+        else:
+            result = bank_api("create_problem_ticket", WR=wr.strip(), Stockcode=stockcode.strip(), Qty_Fisik=qty_fisik, Qty_Ellipse=qty_ellipse, Kategori=category, Uraian_Problem=description.strip())
+            if api_success(result): st.success(f"Tiket berhasil dibuat: {result.get('ticket_id')}. Status OPEN."); st.rerun()
+            else: st.error(result.get("message", "Gagal membuat tiket."))
+elif menu == "My Problem Tickets":
+    st.title("🎫 My Problem Tickets")
+    try:
+        dfp = load_problem_tickets(own_only=True)
+        if dfp.empty: st.info("Anda belum memiliki laporan problem.")
+        else:
+            st.dataframe(dfp, use_container_width=True, hide_index=True)
+            st.download_button("Export tiket saya (CSV)", dfp.to_csv(index=False).encode("utf-8-sig"), "my_problem_tickets.csv", "text/csv")
+    except Exception as exc: st.error(str(exc))
+elif menu == "Bank Problem Dashboard":
+    st.title("📊 Warehouse Bank Problem Dashboard")
+    try:
+        dfp = load_problem_tickets(False)
+        if dfp.empty: st.info("Belum ada tiket problem.")
+        else:
+            status = dfp.get("Status", pd.Series(dtype=str)).astype(str).str.upper()
+            x1,x2,x3,x4 = st.columns(4)
+            x1.metric("Total Ticket", len(dfp)); x2.metric("OPEN", int((status=="OPEN").sum())); x3.metric("IN PROGRESS", int((status=="IN PROGRESS").sum())); x4.metric("CLOSE", int((status=="CLOSE").sum()))
+            st.subheader("Ticket Terbaru")
+            st.dataframe(dfp.sort_values("Timestamp", ascending=False) if "Timestamp" in dfp else dfp, use_container_width=True, hide_index=True)
+    except Exception as exc: st.error(str(exc))
+elif menu == "All Problem Tickets":
+    st.title("📥 All Problem Tickets / Follow Up")
+    try:
+        dfp = load_problem_tickets(False)
+        if dfp.empty: st.info("Belum ada tiket.")
+        else:
+            ticket_ids = dfp["Ticket_ID"].astype(str).tolist()
+            selected = st.selectbox("Pilih Ticket", ticket_ids)
+            row = dfp[dfp["Ticket_ID"].astype(str)==selected].iloc[0]
+            st.json(row.to_dict())
+            with st.form("ticket_followup"):
+                status_new = st.selectbox("Status", ["OPEN", "IN PROGRESS", "CLOSE"], index=["OPEN","IN PROGRESS","CLOSE"].index(str(row.get("Status","OPEN")).upper()) if str(row.get("Status","OPEN")).upper() in ["OPEN","IN PROGRESS","CLOSE"] else 0)
+                pic = st.text_input("PIC / Penanggung Jawab", value=str(row.get("PIC", "")))
+                analysis = st.text_area("Analisa Supervisor", value=str(row.get("Analisa_Supervisor", "")))
+                action_text = st.text_area("Tindakan Perbaikan", value=str(row.get("Tindakan_Perbaikan", "")))
+                closing = st.text_area("Closing Remarks", value=str(row.get("Closing_Remarks", "")))
+                save = st.form_submit_button("Simpan Update Ticket", type="primary")
+            if save:
+                if status_new == "CLOSE" and not closing.strip(): st.error("Closing Remarks wajib diisi sebelum CLOSE.")
                 else:
-                    show_cols = [c for c in ["Tanggal_Transaksi","Equipment_No","Nama_Unit","Lokasi_Asal","Lokasi_Tujuan","PIC","Request_ID","Process_Status"] if c in open_demobs.columns]
-                    st.dataframe(open_demobs[show_cols], use_container_width=True, hide_index=True)
-                    options = open_demobs.to_dict("records")
-                    labels = [f"{r.get('Equipment_No','')} | {r.get('Tanggal_Transaksi','')} | {r.get('Lokasi_Asal','')} → {r.get('Lokasi_Tujuan','')}" for r in options]
-                    selected = st.selectbox("Pilih proses DEMOB yang selesai diverifikasi", range(len(options)), format_func=lambda i: labels[i])
-                    manifest_number = st.text_input("Nomor Manifest *", placeholder="Masukkan nomor manifest yang valid", help="Nomor manifest wajib diisi sebelum proses DEMOB dapat ditutup.").strip()
-                    confirm = st.checkbox("Saya sudah memverifikasi proses DEMOB, nomor manifest, dan menyetujui penutupan.")
-                    if st.button("Tutup Proses DEMOB", type="primary", disabled=(not confirm or not manifest_number)):
-                        req_id = str(options[selected].get("Request_ID", "")).strip()
-                        if not req_id:
-                            st.error("Request_ID kosong; proses tidak dapat ditutup dengan aman.")
-                        elif not manifest_number:
-                            st.error("Nomor Manifest wajib diisi sebelum status diubah menjadi CLOSE.")
-                        else:
-                            response = post_to_webapp({"action":"close_demob","Request_ID":req_id,"Closed_By":st.session_state.username,"Manifest_Number":manifest_number})
-                            if api_success(response):
-                                st.success(response.get("message", "Proses ditutup."))
-                                st.cache_data.clear()
-                                st.rerun()
-                            else:
-                                st.error(response.get("message", "Gagal menutup proses DEMOB."))
-        except Exception as exc:
-            st.error(f"Gagal memuat atau memperbarui status DEMOB: {exc}")
+                    res = bank_api("update_problem_ticket", Ticket_ID=selected, Status=status_new, PIC=pic, Analisa_Supervisor=analysis, Tindakan_Perbaikan=action_text, Closing_Remarks=closing)
+                    if api_success(res): st.success(res.get("message", "Tiket diperbarui.")); st.rerun()
+                    else: st.error(res.get("message", "Update gagal."))
+    except Exception as exc: st.error(str(exc))
+elif menu == "Master Kategori Problem":
+    st.title("⚙️ Master Kategori Problem")
+    try:
+        cats = load_problem_categories()
+        st.dataframe(pd.DataFrame(cats), use_container_width=True, hide_index=True)
+        with st.form("add_problem_category"):
+            new_cat = st.text_input("Nama kategori baru")
+            add = st.form_submit_button("Tambah Kategori", type="primary")
+        if add:
+            res = bank_api("add_problem_category", category=new_cat.strip())
+            if api_success(res): st.success(res.get("message", "Kategori ditambahkan.")); st.rerun()
+            else: st.error(res.get("message", "Gagal menambah kategori."))
+        active_names = [x["category"] for x in cats]
+        if active_names:
+            chosen = st.selectbox("Pilih kategori untuk aktif/nonaktif", active_names)
+            active = st.toggle("Kategori aktif", value=next((str(x.get("active","TRUE")).upper() not in ["FALSE","0","NO"] for x in cats if x["category"]==chosen), True))
+            if st.button("Simpan Status Kategori"):
+                res = bank_api("set_problem_category", category=chosen, active=active)
+                if api_success(res): st.success("Status kategori diperbarui."); st.rerun()
+                else: st.error(res.get("message", "Gagal memperbarui kategori."))
+    except Exception as exc: st.error(str(exc))
+elif menu == "Problem Analysis":
+    st.title("📈 Problem Analysis")
+    try:
+        dfp = load_problem_tickets(False)
+        if dfp.empty: st.info("Belum ada data analisis.")
+        else:
+            if "Kategori" in dfp: st.plotly_chart(px.bar(dfp.groupby("Kategori").size().reset_index(name="Jumlah"), x="Kategori", y="Jumlah", title="Problem by Category"), use_container_width=True)
+            if "Status" in dfp: st.plotly_chart(px.pie(dfp, names="Status", title="Ticket Status", hole=.4), use_container_width=True)
+            st.dataframe(dfp, use_container_width=True, hide_index=True)
+    except Exception as exc: st.error(str(exc))
