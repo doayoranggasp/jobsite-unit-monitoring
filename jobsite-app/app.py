@@ -19,14 +19,31 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton > button {
-        width: 100%;
-        background-color: #007bff;
-        color: white;
-        border-radius: 8px;
-        font-weight: bold;
-    }
+    :root { --navy:#14243a; --blue:#1769aa; --ink:#172b4d; --muted:#66758a; --line:#e5eaf1; --surface:#ffffff; --canvas:#f3f6fa; }
+    .stApp { background:var(--canvas); color:var(--ink); }
+    [data-testid="stHeader"] { background:rgba(243,246,250,.92); }
+    [data-testid="stSidebar"] { background:#14243a; border-right:1px solid #263a55; }
+    [data-testid="stSidebar"] * { color:#edf3fb !important; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label { padding:7px 10px; border-radius:8px; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label:hover { background:#263d5b; }
+    [data-testid="stSidebar"] hr { border-color:#344963; }
+    [data-testid="stSidebar"] .stButton button { background:#2677c9; border:0; color:white !important; }
+    .block-container { max-width:1500px; padding-top:2rem; padding-bottom:3rem; }
+    h1,h2,h3 { color:#172b4d; letter-spacing:-.02em; }
+    h1 { font-weight:750; }
+    [data-testid="stMetric"] { background:#fff; border:1px solid var(--line); padding:17px 18px; border-radius:13px; box-shadow:0 2px 8px rgba(20,36,58,.04); }
+    [data-testid="stMetricLabel"] { color:#66758a; font-weight:600; }
+    [data-testid="stMetricValue"] { color:#172b4d; font-weight:750; }
+    [data-testid="stForm"] { background:#fff; border:1px solid var(--line); padding:22px; border-radius:14px; }
+    [data-testid="stDataFrame"] { background:#fff; border:1px solid var(--line); border-radius:12px; }
+    .page-eyebrow { color:#1769aa; text-transform:uppercase; letter-spacing:.12em; font-size:.76rem; font-weight:800; margin-bottom:.35rem; }
+    .page-subtitle { color:#66758a; margin-top:-.55rem; margin-bottom:1.3rem; }
+    .section-card { background:#fff; border:1px solid #e5eaf1; border-radius:14px; padding:18px 20px; margin:10px 0 16px; }
+    .section-card h3 { margin:0 0 5px 0; font-size:1.05rem; }
+    .section-card p { color:#66758a; margin:0; font-size:.9rem; }
+    .stButton button, .stFormSubmitButton button { border-radius:9px; font-weight:650; min-height:2.55rem; }
+    .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] { border-radius:8px; }
+    div[data-testid="stAlert"] { border-radius:10px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -317,31 +334,27 @@ except Exception as exc:
 # =========================================================
 # SIDEBAR NAVIGATION
 # =========================================================
-st.sidebar.title("Jobsite Fleet System")
+st.sidebar.markdown("## JOBSITE FLEET")
+st.sidebar.caption("OPERATIONS MANAGEMENT SYSTEM")
 role = str(st.session_state.get("user_role", "Operator")).strip().lower()
 is_supervisor = role in ["supervisor", "admin", "warehouse supervisor"]
-st.sidebar.info(f"User: {st.session_state.username}\nRole: {st.session_state.user_role}")
-
+st.sidebar.info(f"{st.session_state.username}  ·  {st.session_state.user_role}")
+module = st.sidebar.radio("PILIH AREA KERJA", ["Unit Management", "Warehouse Management"], key="active_module_choice")
 unit_pages = ["Dashboard Overview", "Master Jobsite", "Master Data Unit", "Upload / Update Master MSE600", "Form Mob / Demob", "Log Transaksi Permanen"]
 warehouse_pages = ["Submit Bank Problem", "My Problem Tickets"]
 if is_supervisor:
-    warehouse_pages = ["Bank Problem Dashboard", "All Problem Tickets", "Master Kategori Problem", "Problem Analysis"]
-
-st.sidebar.markdown("### UNIT MANAGEMENT")
-unit_menu = st.sidebar.radio("Unit Management", unit_pages, key="unit_navigation")
-st.sidebar.markdown("### WAREHOUSE MANAGEMENT")
-warehouse_menu = st.sidebar.radio("Warehouse Management", warehouse_pages, key="warehouse_navigation")
-menu = warehouse_menu if warehouse_menu in warehouse_pages and st.session_state.get("active_module") == "warehouse" else unit_menu
-module = st.sidebar.radio("Pilih Modul", ["Unit Management", "Warehouse Management"], horizontal=True, key="active_module_choice")
-menu = warehouse_menu if module == "Warehouse Management" else unit_menu
-
+    warehouse_pages += ["Bank Problem Dashboard", "All Problem Tickets", "Master Kategori Problem", "Problem Analysis"]
+if module == "Warehouse Management":
+    st.sidebar.markdown("### WAREHOUSE WORKSPACE")
+    menu = st.sidebar.radio("Navigasi Warehouse", warehouse_pages, key="warehouse_navigation")
+else:
+    st.sidebar.markdown("### FLEET WORKSPACE")
+    menu = st.sidebar.radio("Navigasi Unit", unit_pages, key="unit_navigation")
 st.sidebar.markdown("---")
-
-if st.sidebar.button("Refresh Data Real-Time"):
+if st.sidebar.button("↻  Refresh Data", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
-
-if st.sidebar.button("Logout"):
+if st.sidebar.button("Keluar", use_container_width=True):
     st.session_state.logged_in = False
     st.session_state.username = ""
     st.session_state.user_role = "Operator"
@@ -705,17 +718,26 @@ def bank_api(action, **kwargs):
 
 def load_problem_categories():
     r = bank_api("get_problem_categories")
-    if not api_success(r): raise RuntimeError(r.get("message", "Gagal memuat kategori"))
+    if not api_success(r):
+        raise RuntimeError(r.get("message", "Gagal memuat kategori"))
     return r.get("categories", [])
 
 def load_problem_tickets(own_only=False):
     r = bank_api("get_problem_tickets", own_only=own_only)
-    if not api_success(r): raise RuntimeError(r.get("message", "Gagal memuat tiket"))
+    if not api_success(r):
+        raise RuntimeError(r.get("message", "Gagal memuat tiket"))
     return pd.DataFrame(r.get("tickets", []))
 
+def page_heading(eyebrow, title, subtitle):
+    st.markdown(f'<div class="page-eyebrow">{eyebrow}</div><h1>{title}</h1><div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
+
+def status_counts(frame):
+    statuses = frame.get("Status", pd.Series(dtype=str)).fillna("").astype(str).str.upper().str.strip()
+    return len(frame), int((statuses == "OPEN").sum()), int((statuses == "IN PROGRESS").sum()), int(statuses.isin(["CLOSE", "CLOSED"]).sum())
+
 if menu == "Submit Bank Problem":
-    st.title("🧰 Submit Warehouse Problem")
-    st.caption("Laporkan kendala inventory / warehouse. Tiket akan diteruskan ke Warehouse Supervisor.")
+    page_heading("WAREHOUSE · TICKETING", "Buat Laporan Problem", "Catat kendala material dengan data yang jelas agar dapat ditindaklanjuti oleh Warehouse Supervisor.")
+    st.markdown('<div class="section-card"><h3>Alur pelaporan</h3><p>Isi informasi material → jelaskan temuan → kirim tiket → pantau perkembangan pada menu My Problem Tickets.</p></div>', unsafe_allow_html=True)
     try:
         categories = load_problem_categories()
         active_categories = [x["category"] for x in categories if str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"]]
@@ -723,96 +745,183 @@ if menu == "Submit Bank Problem":
         active_categories = []
         st.error(f"Kategori gagal dimuat: {exc}")
     with st.form("bank_problem_submit", clear_on_submit=True):
-        a,b = st.columns(2)
-        with a: wr = st.text_input("1. WR", placeholder="Masukkan nomor Work Request")
-        with b: stockcode = st.text_input("2. Stockcode (angka)", placeholder="Contoh: 12345678")
-        c,d = st.columns(2)
-        with c: qty_fisik = st.number_input("3. Qty Fisik", min_value=0.0, step=1.0)
-        with d: qty_ellipse = st.number_input("4. Qty Ellipse", min_value=0.0, step=1.0)
-        category = st.selectbox("5. Kategori Problem", active_categories if active_categories else ["Kategori belum tersedia"])
-        description = st.text_area("6. Uraian Problem", height=150, placeholder="Jelaskan kondisi, kronologi, lokasi/bin, dan dampak problem...")
-        submit = st.form_submit_button("Kirim Problem Ticket", type="primary", use_container_width=True)
+        st.subheader("01 · Identitas material")
+        a, b = st.columns(2)
+        with a:
+            wr = st.text_input("Work Request (WR) *", placeholder="Contoh: WR-2026-00125", help="Masukkan nomor WR yang terkait dengan temuan.")
+            stockcode = st.text_input("Stockcode *", placeholder="Masukkan nomor stockcode", help="Gunakan angka sesuai master material.")
+        with b:
+            category = st.selectbox("Kategori problem *", active_categories if active_categories else ["Kategori belum tersedia"])
+            st.caption("Kategori digunakan untuk pengelompokan dan analisis temuan.")
+        st.divider()
+        st.subheader("02 · Detail kuantitas")
+        c, d = st.columns(2)
+        with c:
+            qty_fisik = st.number_input("Qty fisik", min_value=0.0, step=1.0, help="Jumlah aktual hasil pengecekan fisik.")
+        with d:
+            qty_ellipse = st.number_input("Qty Ellipse", min_value=0.0, step=1.0, help="Jumlah yang tercatat pada sistem Ellipse.")
+        st.divider()
+        st.subheader("03 · Uraian temuan")
+        description = st.text_area("Jelaskan problem yang ditemukan *", height=140, placeholder="Tuliskan kondisi aktual, lokasi/bin, kronologi pengecekan, dan dampak terhadap operasional.")
+        st.caption("Pastikan uraian singkat, faktual, dan mudah dipahami oleh PIC tindak lanjut.")
+        submit = st.form_submit_button("KIRIM LAPORAN PROBLEM", type="primary", use_container_width=True)
     if submit:
-        if not wr.strip() or not stockcode.strip() or not description.strip(): st.warning("WR, Stockcode, dan Uraian Problem wajib diisi.")
-        elif not stockcode.strip().isdigit(): st.warning("Stockcode harus berupa angka.")
-        elif not active_categories: st.warning("Master kategori belum tersedia. Hubungi Supervisor.")
+        if not wr.strip() or not stockcode.strip() or not description.strip():
+            st.warning("Lengkapi WR, Stockcode, dan uraian problem terlebih dahulu.")
+        elif not stockcode.strip().isdigit():
+            st.warning("Stockcode harus berupa angka.")
+        elif not active_categories:
+            st.warning("Master kategori belum tersedia. Hubungi Warehouse Supervisor.")
         else:
-            result = bank_api("create_problem_ticket", WR=wr.strip(), Stockcode=stockcode.strip(), Qty_Fisik=qty_fisik, Qty_Ellipse=qty_ellipse, Kategori=category, Uraian_Problem=description.strip())
-            if api_success(result): st.success(f"Tiket berhasil dibuat: {result.get('ticket_id')}. Status OPEN."); st.rerun()
-            else: st.error(result.get("message", "Gagal membuat tiket."))
+            try:
+                result = bank_api("create_problem_ticket", WR=wr.strip(), Stockcode=stockcode.strip(), Qty_Fisik=qty_fisik, Qty_Ellipse=qty_ellipse, Kategori=category, Uraian_Problem=description.strip())
+                if api_success(result):
+                    st.success(f"Laporan berhasil dikirim. Nomor tiket: {result.get('ticket_id')} · Status OPEN")
+                    st.rerun()
+                else:
+                    st.error(result.get("message", "Gagal membuat tiket."))
+            except Exception as exc:
+                st.error(f"Pengiriman tiket gagal: {exc}")
+
 elif menu == "My Problem Tickets":
-    st.title("🎫 My Problem Tickets")
+    page_heading("WAREHOUSE · TRACKING", "Tiket Saya", "Pantau status dan tindak lanjut dari setiap laporan yang Anda kirim.")
     try:
         dfp = load_problem_tickets(own_only=True)
-        if dfp.empty: st.info("Anda belum memiliki laporan problem.")
+        if dfp.empty:
+            st.info("Belum ada laporan problem. Gunakan menu Buat Laporan Problem untuk mengirim temuan pertama.")
         else:
-            st.dataframe(dfp, use_container_width=True, hide_index=True)
-            st.download_button("Export tiket saya (CSV)", dfp.to_csv(index=False).encode("utf-8-sig"), "my_problem_tickets.csv", "text/csv")
-    except Exception as exc: st.error(str(exc))
+            total, opened, progress, closed = status_counts(dfp)
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Total laporan", total); m2.metric("Open", opened); m3.metric("In Progress", progress); m4.metric("Closed", closed)
+            show_cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC", "Updated_Timestamp"] if c in dfp]
+            st.dataframe(dfp[show_cols], use_container_width=True, hide_index=True)
+            st.download_button("Unduh riwayat tiket (CSV)", dfp.to_csv(index=False).encode("utf-8-sig"), "riwayat_problem_tiket.csv", "text/csv")
+    except Exception as exc:
+        st.error(str(exc))
+
 elif menu == "Bank Problem Dashboard":
-    st.title("📊 Warehouse Bank Problem Dashboard")
+    page_heading("WAREHOUSE · PERFORMANCE", "Dashboard Temuan Warehouse", "Ringkasan kondisi tiket, kategori temuan, dan aktivitas tindak lanjut secara real-time.")
     try:
         dfp = load_problem_tickets(False)
-        if dfp.empty: st.info("Belum ada tiket problem.")
+        if dfp.empty:
+            st.info("Belum ada tiket problem yang tercatat.")
         else:
-            status = dfp.get("Status", pd.Series(dtype=str)).astype(str).str.upper()
-            x1,x2,x3,x4 = st.columns(4)
-            x1.metric("Total Ticket", len(dfp)); x2.metric("OPEN", int((status=="OPEN").sum())); x3.metric("IN PROGRESS", int((status=="IN PROGRESS").sum())); x4.metric("CLOSE", int((status=="CLOSE").sum()))
-            st.subheader("Ticket Terbaru")
-            st.dataframe(dfp.sort_values("Timestamp", ascending=False) if "Timestamp" in dfp else dfp, use_container_width=True, hide_index=True)
-    except Exception as exc: st.error(str(exc))
+            total, opened, progress, closed = status_counts(dfp)
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("TOTAL TEMUAN", total); m2.metric("OPEN", opened); m3.metric("IN PROGRESS", progress); m4.metric("CLOSED", closed)
+            left, right = st.columns([1.15, 1])
+            with left:
+                st.markdown("#### Temuan berdasarkan kategori")
+                if "Kategori" in dfp:
+                    cat = dfp["Kategori"].fillna("Tidak dikategorikan").value_counts().rename_axis("Kategori").reset_index(name="Jumlah")
+                    st.plotly_chart(px.bar(cat, x="Jumlah", y="Kategori", orientation="h", text="Jumlah", color_discrete_sequence=["#2878b8"]), use_container_width=True)
+            with right:
+                st.markdown("#### Komposisi status")
+                if "Status" in dfp:
+                    st.plotly_chart(px.pie(dfp, names="Status", hole=.58, color_discrete_sequence=["#e3a43b", "#2878b8", "#2d9b75"]), use_container_width=True)
+            st.markdown("#### Tiket terbaru")
+            show_cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC", "Pelapor"] if c in dfp]
+            st.dataframe(dfp[show_cols].head(15), use_container_width=True, hide_index=True)
+            st.download_button("Export seluruh temuan (CSV)", dfp.to_csv(index=False).encode("utf-8-sig"), "bank_problem_all_tickets.csv", "text/csv")
+    except Exception as exc:
+        st.error(f"Dashboard gagal memuat data: {exc}")
+
 elif menu == "All Problem Tickets":
-    st.title("📥 All Problem Tickets / Follow Up")
+    page_heading("WAREHOUSE · SUPERVISOR", "Inbox & Follow Up Tiket", "Pilih tiket untuk melakukan analisis, menetapkan PIC, dan mencatat tindakan perbaikan hingga penutupan.")
     try:
         dfp = load_problem_tickets(False)
-        if dfp.empty: st.info("Belum ada tiket.")
+        if dfp.empty:
+            st.info("Belum ada tiket yang perlu ditindaklanjuti.")
         else:
-            ticket_ids = dfp["Ticket_ID"].astype(str).tolist()
-            selected = st.selectbox("Pilih Ticket", ticket_ids)
-            row = dfp[dfp["Ticket_ID"].astype(str)==selected].iloc[0]
-            st.json(row.to_dict())
-            with st.form("ticket_followup"):
-                status_new = st.selectbox("Status", ["OPEN", "IN PROGRESS", "CLOSE"], index=["OPEN","IN PROGRESS","CLOSE"].index(str(row.get("Status","OPEN")).upper()) if str(row.get("Status","OPEN")).upper() in ["OPEN","IN PROGRESS","CLOSE"] else 0)
-                pic = st.text_input("PIC / Penanggung Jawab", value=str(row.get("PIC", "")))
-                analysis = st.text_area("Analisa Supervisor", value=str(row.get("Analisa_Supervisor", "")))
-                action_text = st.text_area("Tindakan Perbaikan", value=str(row.get("Tindakan_Perbaikan", "")))
-                closing = st.text_area("Closing Remarks", value=str(row.get("Closing_Remarks", "")))
-                save = st.form_submit_button("Simpan Update Ticket", type="primary")
-            if save:
-                if status_new == "CLOSE" and not closing.strip(): st.error("Closing Remarks wajib diisi sebelum CLOSE.")
-                else:
-                    res = bank_api("update_problem_ticket", Ticket_ID=selected, Status=status_new, PIC=pic, Analisa_Supervisor=analysis, Tindakan_Perbaikan=action_text, Closing_Remarks=closing)
-                    if api_success(res): st.success(res.get("message", "Tiket diperbarui.")); st.rerun()
-                    else: st.error(res.get("message", "Update gagal."))
-    except Exception as exc: st.error(str(exc))
+            total, opened, progress, closed = status_counts(dfp)
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Total", total); m2.metric("Open", opened); m3.metric("In Progress", progress); m4.metric("Closed", closed)
+            statuses = ["Semua status", "OPEN", "IN PROGRESS", "CLOSE"]
+            filter_status = st.selectbox("Filter status tiket", statuses)
+            view = dfp.copy()
+            if filter_status != "Semua status" and "Status" in view:
+                view = view[view["Status"].astype(str).str.upper() == filter_status]
+            id_col = "Ticket_ID"
+            if id_col not in view or view.empty:
+                st.info("Tidak ada tiket pada filter tersebut.")
+            else:
+                cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC"] if c in view]
+                st.dataframe(view[cols], use_container_width=True, hide_index=True)
+                ticket_ids = view[id_col].astype(str).tolist()
+                selected = st.selectbox("Pilih nomor tiket untuk follow up", ticket_ids)
+                row = dfp[dfp[id_col].astype(str) == selected].iloc[0]
+                st.markdown('<div class="section-card"><h3>Detail temuan</h3><p>Periksa informasi laporan sebelum menentukan tindak lanjut.</p></div>', unsafe_allow_html=True)
+                d1, d2, d3 = st.columns(3)
+                d1.write("**WR**\n\n" + str(row.get("WR", "-")))
+                d2.write("**Stockcode**\n\n" + str(row.get("Stockcode", "-")))
+                d3.write("**Kategori**\n\n" + str(row.get("Kategori", "-")))
+                q1, q2 = st.columns(2)
+                q1.metric("Qty Fisik", row.get("Qty_Fisik", 0)); q2.metric("Qty Ellipse", row.get("Qty_Ellipse", 0))
+                st.info(str(row.get("Uraian_Problem", "Tidak ada uraian.")))
+                with st.form("ticket_followup"):
+                    st.subheader("Form tindak lanjut supervisor")
+                    status_values = ["OPEN", "IN PROGRESS", "CLOSE"]
+                    old_status = str(row.get("Status", "OPEN")).upper()
+                    status_new = st.selectbox("Status tiket", status_values, index=status_values.index(old_status) if old_status in status_values else 0)
+                    pic = st.text_input("PIC / Penanggung jawab", value=str(row.get("PIC", "")), placeholder="Nama PIC / fungsi")
+                    analysis = st.text_area("Analisis penyebab", value=str(row.get("Analisa_Supervisor", "")), height=100, placeholder="Tuliskan hasil verifikasi dan akar penyebab problem.")
+                    action_text = st.text_area("Tindakan perbaikan", value=str(row.get("Tindakan_Perbaikan", "")), height=100, placeholder="Tuliskan tindakan korektif yang dilakukan atau direncanakan.")
+                    closing = st.text_area("Catatan penyelesaian / closing remarks", value=str(row.get("Closing_Remarks", "")), height=85, placeholder="Wajib diisi saat status diubah menjadi CLOSE.")
+                    save = st.form_submit_button("SIMPAN FOLLOW UP TIKET", type="primary", use_container_width=True)
+                if save:
+                    if status_new == "CLOSE" and (not closing.strip() or not pic.strip() or not action_text.strip()):
+                        st.error("Sebelum tiket ditutup, PIC, tindakan perbaikan, dan closing remarks wajib diisi.")
+                    elif status_new == "IN PROGRESS" and (not pic.strip() or not analysis.strip()):
+                        st.error("Untuk status IN PROGRESS, PIC dan analisis penyebab wajib diisi.")
+                    else:
+                        res = bank_api("update_problem_ticket", Ticket_ID=selected, Status=status_new, PIC=pic, Analisa_Supervisor=analysis, Tindakan_Perbaikan=action_text, Closing_Remarks=closing)
+                        if api_success(res):
+                            st.success(res.get("message", "Tiket berhasil diperbarui.")); st.rerun()
+                        else:
+                            st.error(res.get("message", "Update tiket gagal."))
+    except Exception as exc:
+        st.error(f"Gagal memuat inbox tiket: {exc}")
+
 elif menu == "Master Kategori Problem":
-    st.title("⚙️ Master Kategori Problem")
+    page_heading("WAREHOUSE · CONFIGURATION", "Master Kategori Problem", "Kelola kategori agar klasifikasi dan analisis temuan tetap konsisten.")
     try:
         cats = load_problem_categories()
         st.dataframe(pd.DataFrame(cats), use_container_width=True, hide_index=True)
         with st.form("add_problem_category"):
-            new_cat = st.text_input("Nama kategori baru")
-            add = st.form_submit_button("Tambah Kategori", type="primary")
+            new_cat = st.text_input("Nama kategori baru", placeholder="Contoh: Material Preservation")
+            add = st.form_submit_button("Tambah kategori", type="primary")
         if add:
-            res = bank_api("add_problem_category", category=new_cat.strip())
-            if api_success(res): st.success(res.get("message", "Kategori ditambahkan.")); st.rerun()
-            else: st.error(res.get("message", "Gagal menambah kategori."))
+            if not new_cat.strip():
+                st.warning("Nama kategori wajib diisi.")
+            else:
+                res = bank_api("add_problem_category", category=new_cat.strip())
+                if api_success(res): st.success(res.get("message", "Kategori ditambahkan.")); st.rerun()
+                else: st.error(res.get("message", "Gagal menambah kategori."))
         active_names = [x["category"] for x in cats]
         if active_names:
-            chosen = st.selectbox("Pilih kategori untuk aktif/nonaktif", active_names)
-            active = st.toggle("Kategori aktif", value=next((str(x.get("active","TRUE")).upper() not in ["FALSE","0","NO"] for x in cats if x["category"]==chosen), True))
-            if st.button("Simpan Status Kategori"):
+            chosen = st.selectbox("Pilih kategori untuk mengubah status", active_names)
+            active = st.toggle("Kategori aktif", value=next((str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"] for x in cats if x["category"] == chosen), True))
+            if st.button("Simpan status kategori", type="primary"):
                 res = bank_api("set_problem_category", category=chosen, active=active)
                 if api_success(res): st.success("Status kategori diperbarui."); st.rerun()
                 else: st.error(res.get("message", "Gagal memperbarui kategori."))
-    except Exception as exc: st.error(str(exc))
+    except Exception as exc:
+        st.error(str(exc))
+
 elif menu == "Problem Analysis":
-    st.title("📈 Problem Analysis")
+    page_heading("WAREHOUSE · ANALYTICS", "Analisis Problem", "Identifikasi pola temuan untuk menentukan prioritas perbaikan inventory dan warehouse.")
     try:
         dfp = load_problem_tickets(False)
-        if dfp.empty: st.info("Belum ada data analisis.")
+        if dfp.empty:
+            st.info("Belum ada data untuk dianalisis.")
         else:
-            if "Kategori" in dfp: st.plotly_chart(px.bar(dfp.groupby("Kategori").size().reset_index(name="Jumlah"), x="Kategori", y="Jumlah", title="Problem by Category"), use_container_width=True)
-            if "Status" in dfp: st.plotly_chart(px.pie(dfp, names="Status", title="Ticket Status", hole=.4), use_container_width=True)
+            left, right = st.columns(2)
+            if "Kategori" in dfp:
+                cat = dfp["Kategori"].fillna("Tidak dikategorikan").value_counts().rename_axis("Kategori").reset_index(name="Jumlah")
+                left.plotly_chart(px.bar(cat, x="Kategori", y="Jumlah", color_discrete_sequence=["#2878b8"], title="Temuan berdasarkan kategori"), use_container_width=True)
+            if "Status" in dfp:
+                right.plotly_chart(px.pie(dfp, names="Status", hole=.55, title="Distribusi status tiket"), use_container_width=True)
             st.dataframe(dfp, use_container_width=True, hide_index=True)
-    except Exception as exc: st.error(str(exc))
+    except Exception as exc:
+        st.error(str(exc))
+
