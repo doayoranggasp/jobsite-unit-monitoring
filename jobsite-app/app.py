@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from streamlit_gsheets import GSheetsConnection
 
@@ -788,21 +788,60 @@ def load_problem_tickets(own_only=False):
     r = bank_api("get_problem_tickets", own_only=own_only)
     if not api_success(r):
         raise RuntimeError(r.get("message", "Gagal memuat tiket"))
-    return pd.DataFrame(r.get("tickets", []))
+    frame = pd.DataFrame(r.get("tickets", []))
+    # Migrasi tampilan: status lama IN PROGRESS dianggap OPEN; status resmi hanya OPEN/CLOSE.
+    if not frame.empty and "Status" in frame.columns:
+        frame["Status"] = frame["Status"].fillna("").astype(str).str.strip().str.upper().replace({"IN PROGRESS": "OPEN", "CLOSED": "CLOSE"})
+    return frame
 
 def page_heading(eyebrow, title, subtitle):
     st.markdown(f'<div class="page-eyebrow">{eyebrow}</div><h1>{title}</h1><div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
 
 def status_counts(frame):
     statuses = frame.get("Status", pd.Series(dtype=str)).fillna("").astype(str).str.upper().str.strip()
-    return len(frame), int((statuses == "OPEN").sum()), int((statuses == "IN PROGRESS").sum()), int(statuses.isin(["CLOSE", "CLOSED"]).sum())
+    closed = int(statuses.isin(["CLOSE", "CLOSED"]).sum())
+    opened = len(frame) - closed
+    return len(frame), opened, closed
+
+
+def build_aging_view(frame, categories):
+    """Hitung aging tiket dari timestamp asli; SLA dibaca dari master kategori."""
+    result = frame.copy()
+    if result.empty:
+        return result
+    cat_sla = {}
+    for item in categories:
+        try:
+            cat_sla[str(item.get("category", "")).strip()] = float(item.get("sla_hours", 0) or 0)
+        except (TypeError, ValueError):
+            cat_sla[str(item.get("category", "")).strip()] = 0
+    now = pd.Timestamp.now(tz="Asia/Makassar").tz_localize(None)
+    timestamps = pd.to_datetime(result.get("Timestamp", pd.Series(index=result.index, dtype=object)), errors="coerce", dayfirst=False)
+    # Normalisasi timestamp yang mengandung timezone menjadi waktu lokal tanpa timezone.
+    try:
+        timestamps = timestamps.dt.tz_localize(None)
+    except (TypeError, AttributeError):
+        pass
+    result["Aging_Jam"] = ((now - timestamps).dt.total_seconds() / 3600).clip(lower=0).round(1)
+    result["Aging_Hari"] = (result["Aging_Jam"] / 24).round(1)
+    category_sla = result.get("Kategori", pd.Series(index=result.index, dtype=str)).map(cat_sla).fillna(0)
+    # SLA_Hours disimpan sebagai snapshot saat tiket dibuat; perubahan master tidak mengubah SLA tiket lama.
+    ticket_sla = pd.to_numeric(result.get("SLA_Hours", pd.Series(index=result.index, dtype=float)), errors="coerce")
+    result["SLA_Jam"] = ticket_sla.where(ticket_sla > 0, category_sla).fillna(0)
+    result["Sisa_SLA_Jam"] = (result["SLA_Jam"] - result["Aging_Jam"]).round(1)
+    result["Aging_Status"] = "ON TRACK"
+    result.loc[result["SLA_Jam"] <= 0, "Aging_Status"] = "SLA BELUM DIATUR"
+    result.loc[(result["SLA_Jam"] > 0) & (result["Aging_Jam"] > result["SLA_Jam"]), "Aging_Status"] = "OVERDUE"
+    result.loc[(result["SLA_Jam"] > 0) & (result["Aging_Jam"] == result["SLA_Jam"]), "Aging_Status"] = "BATAS SLA"
+    result.loc[result.get("Status", pd.Series(index=result.index, dtype=str)).astype(str).str.upper().isin(["CLOSE", "CLOSED"]), "Aging_Status"] = "CLOSED"
+    return result
 
 if menu == "Submit Bank Problem":
     page_heading("WAREHOUSE · TICKETING", "Buat Laporan Problem", "Catat kendala material dengan data yang jelas agar dapat ditindaklanjuti oleh Warehouse Supervisor.")
     st.markdown('<div class="section-card"><h3>Alur pelaporan</h3><p>Isi informasi material → jelaskan temuan → kirim tiket → pantau perkembangan pada menu My Problem Tickets.</p></div>', unsafe_allow_html=True)
     try:
         categories = load_problem_categories()
-        active_categories = [x["category"] for x in categories if str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"]]
+        active_categories = [x["category"] for x in categories if str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"] and float(x.get("sla_hours", 0) or 0) > 0]
     except Exception as exc:
         active_categories = []
         st.error(f"Kategori gagal dimuat: {exc}")
@@ -814,7 +853,7 @@ if menu == "Submit Bank Problem":
             stockcode = st.text_input("Stockcode *", placeholder="Masukkan nomor stockcode", help="Gunakan angka sesuai master material.")
         with b:
             category = st.selectbox("Kategori problem *", active_categories if active_categories else ["Kategori belum tersedia"])
-            st.caption("Kategori digunakan untuk pengelompokan dan analisis temuan.")
+            st.caption("Kategori hanya dapat dipilih jika SLA kategori sudah ditetapkan oleh Supervisor/Admin.")
         st.divider()
         st.subheader("02 · Detail kuantitas")
         c, d = st.columns(2)
@@ -852,9 +891,9 @@ elif menu == "My Problem Tickets":
         if dfp.empty:
             st.info("Belum ada laporan problem. Gunakan menu Buat Laporan Problem untuk mengirim temuan pertama.")
         else:
-            total, opened, progress, closed = status_counts(dfp)
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Total laporan", total); m2.metric("Open", opened); m3.metric("In Progress", progress); m4.metric("Closed", closed)
+            total, opened, closed = status_counts(dfp)
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Total laporan", total); m2.metric("Open", opened); m3.metric("Closed", closed)
             show_cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC", "Updated_Timestamp"] if c in dfp]
             st.dataframe(dfp[show_cols], use_container_width=True, hide_index=True)
             st.download_button("Unduh riwayat tiket (CSV)", dfp.to_csv(index=False).encode("utf-8-sig"), "riwayat_problem_tiket.csv", "text/csv")
@@ -862,31 +901,50 @@ elif menu == "My Problem Tickets":
         st.error(str(exc))
 
 elif menu == "Bank Problem Dashboard":
-    page_heading("WAREHOUSE · PERFORMANCE", "Dashboard Temuan Warehouse", "Ringkasan kondisi tiket, kategori temuan, dan aktivitas tindak lanjut secara real-time.")
+    page_heading("WAREHOUSE · PERFORMANCE", "Dashboard Temuan Warehouse & Aging SLA", "Monitoring tanpa toleransi: seluruh tiket berstatus OPEN dihitung sejak timestamp dibuat hingga ditutup.")
     try:
         dfp = load_problem_tickets(False)
+        categories = load_problem_categories()
         if dfp.empty:
             st.info("Belum ada tiket problem yang tercatat.")
         else:
-            total, opened, progress, closed = status_counts(dfp)
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("TOTAL TEMUAN", total); m2.metric("OPEN", opened); m3.metric("IN PROGRESS", progress); m4.metric("CLOSED", closed)
-            left, right = st.columns([1.15, 1])
+            aging = build_aging_view(dfp, categories)
+            active = aging[~aging["Status"].astype(str).str.upper().isin(["CLOSE", "CLOSED"])].copy()
+            overdue = active[active["Aging_Status"] == "OVERDUE"]
+            unconfigured = active[active["Aging_Status"] == "SLA BELUM DIATUR"]
+            total, opened, closed = status_counts(dfp)
+            m1, m2, m3, m4, m5 = st.columns(5)
+            m1.metric("TOTAL TEMUAN", total)
+            m2.metric("OPEN / OUTSTANDING", opened)
+            m3.metric("CLOSED", closed)
+            m4.metric("OUTSTANDING", len(active))
+            m5.metric("OVERDUE", len(overdue))
+            if len(overdue):
+                st.error(f"PERLU TINDAKAN SEGERA: {len(overdue)} tiket telah melewati SLA kategori.")
+            if len(unconfigured):
+                st.warning(f"{len(unconfigured)} tiket belum dapat dinilai karena SLA kategorinya belum ditetapkan. Lengkapi Master Kategori Problem.")
+            left, right = st.columns([1.1, 1])
             with left:
-                st.markdown("#### Temuan berdasarkan kategori")
-                if "Kategori" in dfp:
-                    cat = dfp["Kategori"].fillna("Tidak dikategorikan").value_counts().rename_axis("Kategori").reset_index(name="Jumlah")
-                    st.plotly_chart(px.bar(cat, x="Jumlah", y="Kategori", orientation="h", text="Jumlah", color_discrete_sequence=["#2878b8"]), use_container_width=True)
+                st.markdown("#### Aging outstanding per kategori")
+                if not active.empty:
+                    ag = active.groupby("Kategori", dropna=False).agg(Jumlah_Tiket=("Ticket_ID", "count"), Rata_Aging_Hari=("Aging_Hari", "mean"), Maks_Aging_Hari=("Aging_Hari", "max")).reset_index()
+                    st.plotly_chart(px.bar(ag, x="Kategori", y="Maks_Aging_Hari", color="Jumlah_Tiket", title="Aging maksimum (hari) per kategori", text_auto=".1f"), use_container_width=True)
             with right:
-                st.markdown("#### Komposisi status")
-                if "Status" in dfp:
-                    st.plotly_chart(px.pie(dfp, names="Status", hole=.58, color_discrete_sequence=["#e3a43b", "#2878b8", "#2d9b75"]), use_container_width=True)
-            st.markdown("#### Tiket terbaru")
-            show_cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC", "Pelapor"] if c in dfp]
-            st.dataframe(dfp[show_cols].head(15), use_container_width=True, hide_index=True)
-            st.download_button("Export seluruh temuan (CSV)", dfp.to_csv(index=False).encode("utf-8-sig"), "bank_problem_all_tickets.csv", "text/csv")
+                st.markdown("#### Status kepatuhan SLA")
+                if not active.empty:
+                    sla_counts = active["Aging_Status"].value_counts().rename_axis("Status SLA").reset_index(name="Jumlah")
+                    st.plotly_chart(px.pie(sla_counts, names="Status SLA", values="Jumlah", hole=.55), use_container_width=True)
+            st.markdown("#### Daftar outstanding — urut aging tertinggi")
+            show_cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC", "Aging_Hari", "SLA_Jam", "Sisa_SLA_Jam", "Aging_Status"] if c in active.columns]
+            st.dataframe(active.sort_values("Aging_Jam", ascending=False)[show_cols], use_container_width=True, hide_index=True)
+            st.markdown("#### Tiket overdue — wajib eskalasi")
+            if overdue.empty:
+                st.success("Tidak ada tiket overdue berdasarkan SLA kategori yang sudah ditetapkan.")
+            else:
+                st.dataframe(overdue.sort_values("Aging_Jam", ascending=False)[show_cols], use_container_width=True, hide_index=True)
+            st.download_button("Export aging & SLA (CSV)", aging.to_csv(index=False).encode("utf-8-sig"), "bank_problem_aging_sla.csv", "text/csv")
     except Exception as exc:
-        st.error(f"Dashboard gagal memuat data: {exc}")
+        st.error(f"Dashboard aging gagal memuat data: {exc}")
 
 elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
     page_heading("WAREHOUSE · TICKET ACTION", "Follow Up Temuan", "Pilih tiket problem terlebih dahulu. Form tindak lanjut akan muncul setelah tiket dipilih. Penutupan tiket hanya dapat dilakukan Supervisor/Admin.")
@@ -895,11 +953,11 @@ elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
         if dfp.empty:
             st.info("Belum ada tiket problem yang dapat ditindaklanjuti.")
         else:
-            total, opened, progress, closed = status_counts(dfp)
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Total", total); m2.metric("Open", opened); m3.metric("In Progress", progress); m4.metric("Closed", closed)
+            total, opened, closed = status_counts(dfp)
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Total", total); m2.metric("Open", opened); m3.metric("Closed", closed)
 
-            statuses = ["Semua status", "OPEN", "IN PROGRESS", "CLOSE"]
+            statuses = ["Semua status", "OPEN", "CLOSE"]
             filter_status = st.selectbox("Filter status tiket", statuses, key="followup_filter_status")
             view = dfp.copy()
             if filter_status != "Semua status" and "Status" in view:
@@ -945,7 +1003,7 @@ elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
                         old_status = str(row.get("Status", "OPEN")).upper()
                         if old_status == "CLOSED":
                             old_status = "CLOSE"
-                        status_values = ["OPEN", "IN PROGRESS"] + (["CLOSE"] if is_supervisor else [])
+                        status_values = ["OPEN"] + (["CLOSE"] if is_supervisor else [])
                         is_locked = old_status == "CLOSE" and not is_supervisor
                         if is_locked:
                             st.warning("Tiket ini sudah ditutup. Hubungi Supervisor/Admin jika diperlukan koreksi.")
@@ -963,8 +1021,6 @@ elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
                     if save:
                         if status_new == "CLOSE" and (not closing.strip() or not pic.strip() or not action_text.strip()):
                             st.error("Sebelum tiket ditutup, PIC, tindakan perbaikan, dan closing remarks wajib diisi.")
-                        elif status_new == "IN PROGRESS" and (not pic.strip() or not analysis.strip()):
-                            st.error("Untuk status IN PROGRESS, PIC dan analisis penyebab wajib diisi.")
                         else:
                             res = bank_api("update_problem_ticket", Ticket_ID=selected, Status=status_new, PIC=pic, Analisa_Supervisor=analysis, Tindakan_Perbaikan=action_text, Closing_Remarks=closing)
                             if api_success(res):
@@ -976,28 +1032,37 @@ elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
         st.error(f"Gagal memuat inbox tiket: {exc}")
 
 elif menu == "Master Kategori Problem":
-    page_heading("WAREHOUSE · CONFIGURATION", "Master Kategori Problem", "Kelola kategori agar klasifikasi dan analisis temuan tetap konsisten.")
+    page_heading("WAREHOUSE · CONFIGURATION", "Master Kategori & SLA Problem", "Supervisor/Admin wajib menetapkan SLA jam untuk setiap kategori. Kategori tanpa SLA tidak dapat dipakai membuat tiket baru.")
     try:
         cats = load_problem_categories()
-        st.dataframe(pd.DataFrame(cats), use_container_width=True, hide_index=True)
+        cat_df = pd.DataFrame(cats)
+        if not cat_df.empty:
+            st.dataframe(cat_df.rename(columns={"category":"Kategori", "active":"Aktif", "sla_hours":"SLA (Jam)"}), use_container_width=True, hide_index=True)
         with st.form("add_problem_category"):
             new_cat = st.text_input("Nama kategori baru", placeholder="Contoh: Material Preservation")
-            add = st.form_submit_button("Tambah kategori", type="primary")
+            new_sla = st.number_input("SLA kategori (jam)", min_value=1, max_value=8760, value=72, step=1, help="Wajib diisi. Contoh 24 = 1 hari; 72 = 3 hari.")
+            add = st.form_submit_button("Tambah kategori + SLA", type="primary")
         if add:
             if not new_cat.strip():
                 st.warning("Nama kategori wajib diisi.")
             else:
-                res = bank_api("add_problem_category", category=new_cat.strip())
+                res = bank_api("add_problem_category", category=new_cat.strip(), sla_hours=int(new_sla))
                 if api_success(res): st.success(res.get("message", "Kategori ditambahkan.")); st.rerun()
                 else: st.error(res.get("message", "Gagal menambah kategori."))
         active_names = [x["category"] for x in cats]
         if active_names:
-            chosen = st.selectbox("Pilih kategori untuk mengubah status", active_names)
-            active = st.toggle("Kategori aktif", value=next((str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"] for x in cats if x["category"] == chosen), True))
-            if st.button("Simpan status kategori", type="primary"):
-                res = bank_api("set_problem_category", category=chosen, active=active)
-                if api_success(res): st.success("Status kategori diperbarui."); st.rerun()
-                else: st.error(res.get("message", "Gagal memperbarui kategori."))
+            chosen = st.selectbox("Pilih kategori untuk pengaturan", active_names, key="sla_category_choice")
+            selected_cat = next(x for x in cats if x["category"] == chosen)
+            current_sla = int(float(selected_cat.get("sla_hours", 0) or 0))
+            sla_value = st.number_input("SLA penyelesaian kategori (jam)", min_value=1, max_value=8760, value=max(1, current_sla), step=1, key="sla_edit_value")
+            active = st.toggle("Kategori aktif", value=str(selected_cat.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"], key="category_active_toggle")
+            if st.button("SIMPAN SLA & STATUS KATEGORI", type="primary"):
+                res = bank_api("set_problem_category", category=chosen, active=active, sla_hours=int(sla_value))
+                if api_success(res): st.success("SLA dan status kategori diperbarui."); st.rerun()
+                else: st.error(res.get("message", "Gagal memperbarui SLA kategori."))
+        missing_sla = [x["category"] for x in cats if float(x.get("sla_hours", 0) or 0) <= 0 and str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"]]
+        if missing_sla:
+            st.error("Kategori aktif belum memiliki SLA: " + ", ".join(missing_sla) + ". Atur SLA satu per satu sebelum kategori dapat digunakan.")
     except Exception as exc:
         st.error(str(exc))
 
