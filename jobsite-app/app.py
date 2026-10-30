@@ -158,6 +158,60 @@ def get_worksheet_id(key):
         ) from exc
 
 
+def load_branding_assets():
+    """Baca konfigurasi logo dan background dari worksheet App_Assets."""
+    conn = get_gsheets_connection()
+    if conn is None:
+        return pd.DataFrame(columns=["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"])
+    gid = get_worksheet_id("branding_assets_gid")
+    try:
+        df = conn.read(worksheet=gid, ttl=60)
+    except Exception:
+        # Worksheet baru mungkin belum memiliki header/data.
+        return pd.DataFrame(columns=["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"])
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"])
+    df.columns = [str(c).strip() for c in df.columns]
+    for col in ["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"]:
+        if col not in df.columns:
+            df[col] = ""
+    return df[["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"]].fillna("")
+
+
+def get_branding_url(asset_key):
+    """Ambil URL aset aktif dari database branding."""
+    try:
+        assets = load_branding_assets()
+        if assets.empty:
+            return ""
+        rows = assets[assets["Asset_Key"].astype(str).str.strip().str.upper() == asset_key.upper()]
+        if rows.empty:
+            return ""
+        row = rows.iloc[-1]
+        active = str(row.get("Active", "TRUE")).strip().upper()
+        if active in ["FALSE", "0", "NO", "NONAKTIF"]:
+            return ""
+        url = str(row.get("Asset_URL", "")).strip()
+        return url if url.startswith(("https://", "http://")) else ""
+    except Exception:
+        return ""
+
+
+def save_branding_assets(logo_url, background_url):
+    """Simpan dua aset branding ke worksheet App_Assets."""
+    conn = get_gsheets_connection()
+    if conn is None:
+        raise RuntimeError("Koneksi Google Sheets tidak tersedia.")
+    gid = get_worksheet_id("branding_assets_gid")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    rows = pd.DataFrame([
+        {"Asset_Key": "COMPANY_LOGO", "Asset_URL": logo_url.strip(), "Active": "TRUE", "Updated_By": st.session_state.username, "Updated_At": now},
+        {"Asset_Key": "APP_BACKGROUND", "Asset_URL": background_url.strip(), "Active": "TRUE", "Updated_By": st.session_state.username, "Updated_At": now},
+    ])
+    conn.update(worksheet=gid, data=rows)
+    st.cache_data.clear()
+
+
 def clean_text_series(series):
     """Konversi kolom menjadi teks tanpa nilai NaN/None."""
     return (
@@ -334,19 +388,27 @@ except Exception as exc:
 # =========================================================
 # SIDEBAR NAVIGATION
 # =========================================================
+logo_url = get_branding_url("COMPANY_LOGO")
+background_url = get_branding_url("APP_BACKGROUND")
+if logo_url:
+    st.sidebar.image(logo_url, use_container_width=True)
 st.sidebar.markdown("## JOBSITE FLEET")
 st.sidebar.caption("OPERATIONS MANAGEMENT SYSTEM")
+if background_url:
+    st.markdown(f"""<style>.stApp {{ background-image: linear-gradient(rgba(244,247,251,.91), rgba(244,247,251,.91)), url('{background_url}'); background-size: cover; background-position: center; background-attachment: fixed; }}</style>""", unsafe_allow_html=True)
 role = str(st.session_state.get("user_role", "Operator")).strip().lower()
 is_supervisor = role in ["supervisor", "admin", "warehouse supervisor"]
 st.sidebar.info(f"{st.session_state.username}  ·  {st.session_state.user_role}")
 module = st.sidebar.radio("PILIH AREA KERJA", ["Unit Management", "Warehouse Management"], key="active_module_choice")
 unit_pages = ["Dashboard Overview", "Master Jobsite", "Master Data Unit", "Upload / Update Master MSE600", "Form Mob / Demob", "Log Transaksi Permanen"]
-warehouse_pages = ["Submit Bank Problem", "My Problem Tickets"]
+# Dashboard temuan dapat dilihat seluruh user Warehouse; menu administrasi tetap khusus supervisor.
+warehouse_pages = ["Bank Problem Dashboard", "Submit Bank Problem", "My Problem Tickets", "Follow Up Temuan"]
 if is_supervisor:
-    warehouse_pages += ["Bank Problem Dashboard", "All Problem Tickets", "Master Kategori Problem", "Problem Analysis"]
+    warehouse_pages += ["Master Kategori Problem", "Problem Analysis", "Branding & Tampilan"]
 if module == "Warehouse Management":
     st.sidebar.markdown("### WAREHOUSE WORKSPACE")
     menu = st.sidebar.radio("Navigasi Warehouse", warehouse_pages, key="warehouse_navigation")
+    st.sidebar.caption("Follow Up Temuan tersedia untuk seluruh tim Warehouse. Closing tiket khusus Supervisor/Admin.")
 else:
     st.sidebar.markdown("### FLEET WORKSPACE")
     menu = st.sidebar.radio("Navigasi Unit", unit_pages, key="unit_navigation")
@@ -826,8 +888,8 @@ elif menu == "Bank Problem Dashboard":
     except Exception as exc:
         st.error(f"Dashboard gagal memuat data: {exc}")
 
-elif menu == "All Problem Tickets":
-    page_heading("WAREHOUSE · SUPERVISOR", "Inbox & Follow Up Tiket", "Pilih tiket untuk melakukan analisis, menetapkan PIC, dan mencatat tindakan perbaikan hingga penutupan.")
+elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
+    page_heading("WAREHOUSE · TICKET ACTION", "Follow Up Temuan", "Seluruh anggota Warehouse dapat memperbarui progres, PIC, analisis, dan tindakan perbaikan. Penutupan tiket hanya dapat dilakukan Supervisor/Admin.")
     try:
         dfp = load_problem_tickets(False)
         if dfp.empty:
@@ -859,10 +921,12 @@ elif menu == "All Problem Tickets":
                 q1.metric("Qty Fisik", row.get("Qty_Fisik", 0)); q2.metric("Qty Ellipse", row.get("Qty_Ellipse", 0))
                 st.info(str(row.get("Uraian_Problem", "Tidak ada uraian.")))
                 with st.form("ticket_followup"):
-                    st.subheader("Form tindak lanjut supervisor")
-                    status_values = ["OPEN", "IN PROGRESS", "CLOSE"]
+                    st.subheader("Form tindak lanjut tim Warehouse")
                     old_status = str(row.get("Status", "OPEN")).upper()
-                    status_new = st.selectbox("Status tiket", status_values, index=status_values.index(old_status) if old_status in status_values else 0)
+                    status_values = ["OPEN", "IN PROGRESS"] + (["CLOSE"] if is_supervisor else [])
+                    if old_status in ["CLOSED", "CLOSE"] and not is_supervisor:
+                        st.warning("Tiket ini sudah ditutup. Hubungi Supervisor/Admin jika perlu koreksi.")
+                    status_new = st.selectbox("Status tiket", status_values, index=status_values.index(old_status) if old_status in status_values else 0, disabled=(old_status in ["CLOSED", "CLOSE"] and not is_supervisor))
                     pic = st.text_input("PIC / Penanggung jawab", value=str(row.get("PIC", "")), placeholder="Nama PIC / fungsi")
                     analysis = st.text_area("Analisis penyebab", value=str(row.get("Analisa_Supervisor", "")), height=100, placeholder="Tuliskan hasil verifikasi dan akar penyebab problem.")
                     action_text = st.text_area("Tindakan perbaikan", value=str(row.get("Tindakan_Perbaikan", "")), height=100, placeholder="Tuliskan tindakan korektif yang dilakukan atau direncanakan.")
@@ -924,4 +988,36 @@ elif menu == "Problem Analysis":
             st.dataframe(dfp, use_container_width=True, hide_index=True)
     except Exception as exc:
         st.error(str(exc))
+
+elif menu == "Branding & Tampilan":
+    page_heading("SYSTEM · BRANDING", "Pengaturan Logo & Background", "Kelola identitas visual aplikasi melalui database Google Sheets. Gunakan URL gambar publik dari Google Drive atau server perusahaan.")
+    try:
+        current_assets = load_branding_assets()
+        def current_asset(key):
+            found = current_assets[current_assets["Asset_Key"].astype(str).str.upper() == key]
+            return str(found.iloc[-1]["Asset_URL"]) if not found.empty else ""
+        current_logo = current_asset("COMPANY_LOGO")
+        current_bg = current_asset("APP_BACKGROUND")
+        with st.form("branding_settings_form"):
+            st.subheader("Identitas perusahaan")
+            logo_input = st.text_input("URL Logo Perusahaan", value=current_logo, placeholder="https://...", help="Gunakan link gambar PNG/JPG yang dapat diakses publik.")
+            bg_input = st.text_input("URL Background Aplikasi", value=current_bg, placeholder="https://...", help="Gunakan gambar landscape resolusi tinggi; sistem memberi lapisan putih transparan agar teks tetap terbaca.")
+            save_branding = st.form_submit_button("SIMPAN BRANDING", type="primary", use_container_width=True)
+        if current_logo:
+            st.markdown("**Preview logo saat ini**")
+            st.image(current_logo, width=180)
+        if current_bg:
+            st.markdown("**Preview background saat ini**")
+            st.image(current_bg, use_container_width=True)
+        if save_branding:
+            for label, url in [("Logo", logo_input), ("Background", bg_input)]:
+                if url.strip() and not url.strip().startswith(("https://", "http://")):
+                    st.error(f"URL {label} harus diawali http:// atau https://")
+                    st.stop()
+            save_branding_assets(logo_input, bg_input)
+            st.success("Pengaturan logo dan background berhasil disimpan ke database App_Assets.")
+            st.rerun()
+        st.info("Database yang digunakan: worksheet App_Assets. Kolom: Asset_Key, Asset_URL, Active, Updated_By, Updated_At. Upload gambar ke Google Drive, atur akses Viewer/Anyone with the link, lalu masukkan URL gambar langsung di atas.")
+    except Exception as exc:
+        st.error(f"Pengaturan branding gagal dimuat/disimpan: {exc}")
 
