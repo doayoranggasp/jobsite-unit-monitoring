@@ -889,60 +889,89 @@ elif menu == "Bank Problem Dashboard":
         st.error(f"Dashboard gagal memuat data: {exc}")
 
 elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
-    page_heading("WAREHOUSE · TICKET ACTION", "Follow Up Temuan", "Seluruh anggota Warehouse dapat memperbarui progres, PIC, analisis, dan tindakan perbaikan. Penutupan tiket hanya dapat dilakukan Supervisor/Admin.")
+    page_heading("WAREHOUSE · TICKET ACTION", "Follow Up Temuan", "Pilih tiket problem terlebih dahulu. Form tindak lanjut akan muncul setelah tiket dipilih. Penutupan tiket hanya dapat dilakukan Supervisor/Admin.")
     try:
         dfp = load_problem_tickets(False)
         if dfp.empty:
-            st.info("Belum ada tiket yang perlu ditindaklanjuti.")
+            st.info("Belum ada tiket problem yang dapat ditindaklanjuti.")
         else:
             total, opened, progress, closed = status_counts(dfp)
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Total", total); m2.metric("Open", opened); m3.metric("In Progress", progress); m4.metric("Closed", closed)
+
             statuses = ["Semua status", "OPEN", "IN PROGRESS", "CLOSE"]
-            filter_status = st.selectbox("Filter status tiket", statuses)
+            filter_status = st.selectbox("Filter status tiket", statuses, key="followup_filter_status")
             view = dfp.copy()
             if filter_status != "Semua status" and "Status" in view:
-                view = view[view["Status"].astype(str).str.upper() == filter_status]
+                view = view[view["Status"].astype(str).str.upper().isin([filter_status, "CLOSED"] if filter_status == "CLOSE" else [filter_status])]
+
             id_col = "Ticket_ID"
-            if id_col not in view or view.empty:
+            if id_col not in view.columns or view.empty:
                 st.info("Tidak ada tiket pada filter tersebut.")
             else:
-                cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC"] if c in view]
+                st.markdown("#### Daftar tiket problem")
+                cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC"] if c in view.columns]
                 st.dataframe(view[cols], use_container_width=True, hide_index=True)
-                ticket_ids = view[id_col].astype(str).tolist()
-                selected = st.selectbox("Pilih nomor tiket untuk follow up", ticket_ids)
-                row = dfp[dfp[id_col].astype(str) == selected].iloc[0]
-                st.markdown('<div class="section-card"><h3>Detail temuan</h3><p>Periksa informasi laporan sebelum menentukan tindak lanjut.</p></div>', unsafe_allow_html=True)
-                d1, d2, d3 = st.columns(3)
-                d1.write("**WR**\n\n" + str(row.get("WR", "-")))
-                d2.write("**Stockcode**\n\n" + str(row.get("Stockcode", "-")))
-                d3.write("**Kategori**\n\n" + str(row.get("Kategori", "-")))
-                q1, q2 = st.columns(2)
-                q1.metric("Qty Fisik", row.get("Qty_Fisik", 0)); q2.metric("Qty Ellipse", row.get("Qty_Ellipse", 0))
-                st.info(str(row.get("Uraian_Problem", "Tidak ada uraian.")))
-                with st.form("ticket_followup"):
-                    st.subheader("Form tindak lanjut tim Warehouse")
-                    old_status = str(row.get("Status", "OPEN")).upper()
-                    status_values = ["OPEN", "IN PROGRESS"] + (["CLOSE"] if is_supervisor else [])
-                    if old_status in ["CLOSED", "CLOSE"] and not is_supervisor:
-                        st.warning("Tiket ini sudah ditutup. Hubungi Supervisor/Admin jika perlu koreksi.")
-                    status_new = st.selectbox("Status tiket", status_values, index=status_values.index(old_status) if old_status in status_values else 0, disabled=(old_status in ["CLOSED", "CLOSE"] and not is_supervisor))
-                    pic = st.text_input("PIC / Penanggung jawab", value=str(row.get("PIC", "")), placeholder="Nama PIC / fungsi")
-                    analysis = st.text_area("Analisis penyebab", value=str(row.get("Analisa_Supervisor", "")), height=100, placeholder="Tuliskan hasil verifikasi dan akar penyebab problem.")
-                    action_text = st.text_area("Tindakan perbaikan", value=str(row.get("Tindakan_Perbaikan", "")), height=100, placeholder="Tuliskan tindakan korektif yang dilakukan atau direncanakan.")
-                    closing = st.text_area("Catatan penyelesaian / closing remarks", value=str(row.get("Closing_Remarks", "")), height=85, placeholder="Wajib diisi saat status diubah menjadi CLOSE.")
-                    save = st.form_submit_button("SIMPAN FOLLOW UP TIKET", type="primary", use_container_width=True)
-                if save:
-                    if status_new == "CLOSE" and (not closing.strip() or not pic.strip() or not action_text.strip()):
-                        st.error("Sebelum tiket ditutup, PIC, tindakan perbaikan, dan closing remarks wajib diisi.")
-                    elif status_new == "IN PROGRESS" and (not pic.strip() or not analysis.strip()):
-                        st.error("Untuk status IN PROGRESS, PIC dan analisis penyebab wajib diisi.")
-                    else:
-                        res = bank_api("update_problem_ticket", Ticket_ID=selected, Status=status_new, PIC=pic, Analisa_Supervisor=analysis, Tindakan_Perbaikan=action_text, Closing_Remarks=closing)
-                        if api_success(res):
-                            st.success(res.get("message", "Tiket berhasil diperbarui.")); st.rerun()
+
+                ticket_ids = view[id_col].dropna().astype(str).tolist()
+                selected = st.selectbox(
+                    "Pilih tiket problem untuk ditindaklanjuti",
+                    options=[""] + ticket_ids,
+                    format_func=lambda x: "-- Pilih nomor tiket --" if x == "" else x,
+                    key="followup_selected_ticket",
+                )
+
+                if not selected:
+                    st.info("Silakan pilih satu nomor tiket pada daftar di atas. Form Follow Up akan tampil setelah tiket dipilih.")
+                else:
+                    row = dfp[dfp[id_col].astype(str) == selected].iloc[0]
+                    st.markdown("#### Detail tiket terpilih")
+                    d1, d2, d3 = st.columns(3)
+                    d1.write("**Ticket ID**\n\n" + str(row.get("Ticket_ID", "-")))
+                    d2.write("**WR**\n\n" + str(row.get("WR", "-")))
+                    d3.write("**Status**\n\n" + str(row.get("Status", "OPEN")))
+                    d4, d5, d6 = st.columns(3)
+                    d4.write("**Stockcode**\n\n" + str(row.get("Stockcode", "-")))
+                    d5.write("**Kategori**\n\n" + str(row.get("Kategori", "-")))
+                    d6.write("**Pelapor**\n\n" + str(row.get("Pelapor", "-")))
+                    q1, q2 = st.columns(2)
+                    q1.metric("Qty Fisik", row.get("Qty_Fisik", 0))
+                    q2.metric("Qty Ellipse", row.get("Qty_Ellipse", 0))
+                    st.info(str(row.get("Uraian_Problem", "Tidak ada uraian.")))
+
+                    st.divider()
+                    with st.form("ticket_followup_" + str(selected)):
+                        st.subheader("Form tindak lanjut tim Warehouse")
+                        old_status = str(row.get("Status", "OPEN")).upper()
+                        if old_status == "CLOSED":
+                            old_status = "CLOSE"
+                        status_values = ["OPEN", "IN PROGRESS"] + (["CLOSE"] if is_supervisor else [])
+                        is_locked = old_status == "CLOSE" and not is_supervisor
+                        if is_locked:
+                            st.warning("Tiket ini sudah ditutup. Hubungi Supervisor/Admin jika diperlukan koreksi.")
+                        status_new = st.selectbox(
+                            "Status tiket", status_values,
+                            index=status_values.index(old_status) if old_status in status_values else 0,
+                            disabled=is_locked,
+                        )
+                        pic = st.text_input("PIC / Penanggung jawab", value=str(row.get("PIC", "") or ""), placeholder="Nama PIC / fungsi")
+                        analysis = st.text_area("Analisis penyebab", value=str(row.get("Analisa_Supervisor", "") or ""), height=100, placeholder="Tuliskan hasil verifikasi dan akar penyebab problem.")
+                        action_text = st.text_area("Tindakan perbaikan", value=str(row.get("Tindakan_Perbaikan", "") or ""), height=100, placeholder="Tuliskan tindakan korektif yang dilakukan atau direncanakan.")
+                        closing = st.text_area("Catatan penyelesaian / closing remarks", value=str(row.get("Closing_Remarks", "") or ""), height=85, placeholder="Wajib diisi saat status diubah menjadi CLOSE.")
+                        save = st.form_submit_button("SIMPAN FOLLOW UP TIKET", type="primary", use_container_width=True, disabled=is_locked)
+
+                    if save:
+                        if status_new == "CLOSE" and (not closing.strip() or not pic.strip() or not action_text.strip()):
+                            st.error("Sebelum tiket ditutup, PIC, tindakan perbaikan, dan closing remarks wajib diisi.")
+                        elif status_new == "IN PROGRESS" and (not pic.strip() or not analysis.strip()):
+                            st.error("Untuk status IN PROGRESS, PIC dan analisis penyebab wajib diisi.")
                         else:
-                            st.error(res.get("message", "Update tiket gagal."))
+                            res = bank_api("update_problem_ticket", Ticket_ID=selected, Status=status_new, PIC=pic, Analisa_Supervisor=analysis, Tindakan_Perbaikan=action_text, Closing_Remarks=closing)
+                            if api_success(res):
+                                st.success(res.get("message", "Tiket berhasil diperbarui."))
+                                st.rerun()
+                            else:
+                                st.error(res.get("message", "Update tiket gagal."))
     except Exception as exc:
         st.error(f"Gagal memuat inbox tiket: {exc}")
 
