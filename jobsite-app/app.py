@@ -57,7 +57,7 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
     st.session_state.username = ""
 if "user_role" not in st.session_state:
-    st.session_state.user_role = "Operator"
+    st.session_state.user_role = "CREW"
 
 
 # =========================================================
@@ -250,7 +250,7 @@ if not st.session_state.logged_in:
                     if api_success(result):
                         st.session_state.logged_in = True
                         st.session_state.username = l_user
-                        st.session_state.user_role = str(result.get("role", "Operator"))
+                        st.session_state.user_role = str(result.get("role", "CREW")).strip().upper()
                         st.success("Login berhasil.")
                         st.rerun()
                     else:
@@ -396,9 +396,32 @@ st.sidebar.markdown("## JOBSITE FLEET")
 st.sidebar.caption("OPERATIONS MANAGEMENT SYSTEM")
 if background_url:
     st.markdown(f"""<style>.stApp {{ background-image: linear-gradient(rgba(244,247,251,.91), rgba(244,247,251,.91)), url('{background_url}'); background-size: cover; background-position: center; background-attachment: fixed; }}</style>""", unsafe_allow_html=True)
-role = str(st.session_state.get("user_role", "Operator")).strip().lower()
-is_supervisor = role in ["supervisor", "admin", "warehouse supervisor"]
+role = str(st.session_state.get("user_role", "CREW")).strip().lower()
+is_supervisor = role == "supervisor"
 st.sidebar.info(f"{st.session_state.username}  ·  {st.session_state.user_role}")
+with st.sidebar.expander("👤 Profile Saya", expanded=False):
+    st.caption("Atur jabatan pada profil akun Anda.")
+    profile_role = st.selectbox(
+        "Jabatan",
+        ["CREW", "SUPERVISOR"],
+        index=1 if str(st.session_state.user_role).strip().upper() == "SUPERVISOR" else 0,
+        key="profile_role_choice",
+    )
+    if st.button("Simpan Profile", key="save_profile_role", use_container_width=True):
+        try:
+            profile_result = post_to_webapp({
+                "action": "update_profile",
+                "username": st.session_state.username,
+                "role": profile_role,
+            })
+            if api_success(profile_result):
+                st.session_state.user_role = profile_role
+                st.success("Jabatan profile berhasil diperbarui.")
+                st.rerun()
+            else:
+                st.error(profile_result.get("message", "Gagal memperbarui profile."))
+        except Exception as exc:
+            st.error(f"Gagal menyimpan profile: {exc}")
 module = st.sidebar.radio("PILIH AREA KERJA", ["Unit Management", "Warehouse Management"], key="active_module_choice")
 unit_pages = ["Dashboard Overview", "Master Jobsite", "Master Data Unit", "Upload / Update Master MSE600", "Form Mob / Demob", "Log Transaksi Permanen"]
 # Dashboard temuan dapat dilihat seluruh user Warehouse; menu administrasi tetap khusus supervisor.
@@ -408,7 +431,7 @@ if is_supervisor:
 if module == "Warehouse Management":
     st.sidebar.markdown("### WAREHOUSE WORKSPACE")
     menu = st.sidebar.radio("Navigasi Warehouse", warehouse_pages, key="warehouse_navigation")
-    st.sidebar.caption("Follow Up Temuan tersedia untuk seluruh tim Warehouse. Closing tiket khusus Supervisor/Admin.")
+    st.sidebar.caption("CREW dan SUPERVISOR dapat melakukan follow up serta menutup temuan.")
 else:
     st.sidebar.markdown("### FLEET WORKSPACE")
     menu = st.sidebar.radio("Navigasi Unit", unit_pages, key="unit_navigation")
@@ -419,7 +442,7 @@ if st.sidebar.button("↻  Refresh Data", use_container_width=True):
 if st.sidebar.button("Keluar", use_container_width=True):
     st.session_state.logged_in = False
     st.session_state.username = ""
-    st.session_state.user_role = "Operator"
+    st.session_state.user_role = "CREW"
     st.rerun()
 
 
@@ -947,7 +970,7 @@ elif menu == "Bank Problem Dashboard":
         st.error(f"Dashboard aging gagal memuat data: {exc}")
 
 elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
-    page_heading("WAREHOUSE · TICKET ACTION", "Follow Up Temuan", "Pilih tiket problem terlebih dahulu. Form tindak lanjut akan muncul setelah tiket dipilih. Penutupan tiket hanya dapat dilakukan Supervisor/Admin.")
+    page_heading("WAREHOUSE · TICKET ACTION", "Follow Up Temuan", "Pilih tiket problem terlebih dahulu. Form tindak lanjut akan muncul setelah tiket dipilih. Semua jabatan dapat menutup tiket.")
     try:
         dfp = load_problem_tickets(False)
         if dfp.empty:
@@ -1000,13 +1023,13 @@ elif menu in ["All Problem Tickets", "Follow Up Temuan"]:
                     st.divider()
                     with st.form("ticket_followup_" + str(selected)):
                         st.subheader("Form tindak lanjut tim Warehouse")
-                        old_status = str(row.get("Status", "OPEN")).upper()
-                        if old_status == "CLOSED":
-                            old_status = "CLOSE"
-                        status_values = ["OPEN"] + (["CLOSE"] if is_supervisor else [])
-                        is_locked = old_status == "CLOSE" and not is_supervisor
+                        old_status = str(row.get("Status", "OPEN")).strip().upper()
+                        if old_status in ["CLOSED", "IN PROGRESS"]:
+                            old_status = "CLOSE" if old_status == "CLOSED" else "OPEN"
+                        status_values = ["OPEN", "CLOSE"]
+                        is_locked = old_status == "CLOSE"
                         if is_locked:
-                            st.warning("Tiket ini sudah ditutup. Hubungi Supervisor/Admin jika diperlukan koreksi.")
+                            st.warning("Tiket ini sudah CLOSE dan terkunci. Tiket yang sudah ditutup tidak dapat dibuka kembali.")
                         status_new = st.selectbox(
                             "Status tiket", status_values,
                             index=status_values.index(old_status) if old_status in status_values else 0,
