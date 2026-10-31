@@ -872,8 +872,8 @@ if menu == "Submit Bank Problem":
         st.subheader("01 · Identitas material")
         a, b = st.columns(2)
         with a:
-            wr = st.text_input("Work Request (WR) *", placeholder="Contoh: WR-2026-00125", help="Masukkan nomor WR yang terkait dengan temuan.")
-            stockcode = st.text_input("Stockcode *", placeholder="Masukkan nomor stockcode", help="Gunakan angka sesuai master material.")
+            wr = st.text_input("WR / PO *", placeholder="Masukkan nomor PO / WR", help="Masukkan nomor WR yang terkait dengan temuan.")
+            stockcode = st.text_input("Stockcode / PR *", placeholder="Masukkan nomor Stockcode / PR", help="Gunakan angka sesuai master material.")
         with b:
             category = st.selectbox("Kategori problem *", active_categories if active_categories else ["Kategori belum tersedia"])
             st.caption("Kategori hanya dapat dipilih jika SLA kategori sudah ditetapkan oleh Supervisor/Admin.")
