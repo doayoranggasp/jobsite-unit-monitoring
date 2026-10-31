@@ -10,7 +10,7 @@ from streamlit_gsheets import GSheetsConnection
 # CONFIGURATION
 # =========================================================
 st.set_page_config(
-    page_title="Jobsite Fleet Management System",
+    page_title="Warehouse INDE-Mining",
     page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -226,7 +226,7 @@ def clean_text_series(series):
 # LOGIN / REGISTER
 # =========================================================
 if not st.session_state.logged_in:
-    st.title("Login & Register - Jobsite Fleet System")
+    st.title("Login & Register - Warehose INDE MINING System")
     st.markdown("Silakan masuk menggunakan akun terdaftar atau buat akun baru.")
 
     tab_login, tab_reg = st.tabs(["Login", "Register Akun Baru"])
@@ -392,8 +392,8 @@ logo_url = get_branding_url("COMPANY_LOGO")
 background_url = get_branding_url("APP_BACKGROUND")
 if logo_url:
     st.sidebar.image(logo_url, use_container_width=True)
-st.sidebar.markdown("## JOBSITE FLEET")
-st.sidebar.caption("OPERATIONS MANAGEMENT SYSTEM")
+st.sidebar.markdown("## SM MINING")
+st.sidebar.caption("KPP INDE")
 if background_url:
     st.markdown(f"""<style>.stApp {{ background-image: linear-gradient(rgba(244,247,251,.91), rgba(244,247,251,.91)), url('{background_url}'); background-size: cover; background-position: center; background-attachment: fixed; }}</style>""", unsafe_allow_html=True)
 role = str(st.session_state.get("user_role", "CREW")).strip().lower()
