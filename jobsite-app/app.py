@@ -10,7 +10,7 @@ from streamlit_gsheets import GSheetsConnection
 # CONFIGURATION
 # =========================================================
 st.set_page_config(
-    page_title="Warehouse INDE-Mining",
+    page_title="Jobsite Fleet Management System",
     page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -226,7 +226,7 @@ def clean_text_series(series):
 # LOGIN / REGISTER
 # =========================================================
 if not st.session_state.logged_in:
-    st.title("Login & Register - Warehose INDE MINING System")
+    st.title("Login & Register - Jobsite Fleet System")
     st.markdown("Silakan masuk menggunakan akun terdaftar atau buat akun baru.")
 
     tab_login, tab_reg = st.tabs(["Login", "Register Akun Baru"])
@@ -392,8 +392,8 @@ logo_url = get_branding_url("COMPANY_LOGO")
 background_url = get_branding_url("APP_BACKGROUND")
 if logo_url:
     st.sidebar.image(logo_url, use_container_width=True)
-st.sidebar.markdown("## SM MINING")
-st.sidebar.caption("KPP INDE")
+st.sidebar.markdown("## JOBSITE FLEET")
+st.sidebar.caption("OPERATIONS MANAGEMENT SYSTEM")
 if background_url:
     st.markdown(f"""<style>.stApp {{ background-image: linear-gradient(rgba(244,247,251,.91), rgba(244,247,251,.91)), url('{background_url}'); background-size: cover; background-position: center; background-attachment: fixed; }}</style>""", unsafe_allow_html=True)
 role = str(st.session_state.get("user_role", "CREW")).strip().lower()
@@ -860,52 +860,144 @@ def build_aging_view(frame, categories):
     return result
 
 if menu == "Submit Bank Problem":
-    page_heading("WAREHOUSE · TICKETING", "Buat Laporan Problem", "Catat kendala material dengan data yang jelas agar dapat ditindaklanjuti oleh Warehouse Supervisor.")
-    st.markdown('<div class="section-card"><h3>Alur pelaporan</h3><p>Isi informasi material → jelaskan temuan → kirim tiket → pantau perkembangan pada menu My Problem Tickets.</p></div>', unsafe_allow_html=True)
+    page_heading("WAREHOUSE · TICKETING", "Buat Laporan Problem", "Pilih kategori terlebih dahulu. Form akan menyesuaikan jenis temuan yang dilaporkan.")
+    st.markdown('<div class="section-card"><h3>Alur pelaporan</h3><p>Pilih kategori → lengkapi detail sesuai temuan → kirim tiket → pantau pada menu My Problem Tickets.</p></div>', unsafe_allow_html=True)
+
+    CATEGORY_LABELS = ["Stock Discrepancy", "Problem Bin Loc", "Receiving Problem"]
+    RECEIVING_TYPES = ["Beda Qty", "Beda PO", "Fisik Rusak"]
+
     try:
-        categories = load_problem_categories()
-        active_categories = [x["category"] for x in categories if str(x.get("active", "TRUE")).upper() not in ["FALSE", "0", "NO"] and float(x.get("sla_hours", 0) or 0) > 0]
+        category_master = load_problem_categories()
+        active_master = {
+            str(x.get("category", "")).strip(): x
+            for x in category_master
+            if str(x.get("active", "TRUE")).strip().upper() not in ["FALSE", "0", "NO", "NONAKTIF"]
+            and float(x.get("sla_hours", 0) or 0) > 0
+        }
+        # Label form dibuat konsisten, sementara nilai yang dikirim tetap mengikuti nama di Master_Kategori.
+        category_aliases = {
+            "Stock Discrepancy": ["Stock Discrepancy"],
+            "Problem Bin Loc": ["Problem Bin Loc", "Bin Location Problem", "Problem Bin Location"],
+            "Receiving Problem": ["Receiving Problem"],
+        }
+        available_labels = [
+            label for label in CATEGORY_LABELS
+            if any(alias in active_master for alias in category_aliases[label])
+        ]
     except Exception as exc:
-        active_categories = []
-        st.error(f"Kategori gagal dimuat: {exc}")
-    with st.form("bank_problem_submit", clear_on_submit=True):
-        st.subheader("01 · Identitas material")
-        a, b = st.columns(2)
-        with a:
-            wr = st.text_input("WR / PO *", placeholder="Masukkan nomor PO / WR", help="Masukkan nomor WR yang terkait dengan temuan.")
-            stockcode = st.text_input("Stockcode / PR *", placeholder="Masukkan nomor Stockcode / PR", help="Gunakan angka sesuai master material.")
-        with b:
-            category = st.selectbox("Kategori problem *", active_categories if active_categories else ["Kategori belum tersedia"])
-            st.caption("Kategori hanya dapat dipilih jika SLA kategori sudah ditetapkan oleh Supervisor/Admin.")
-        st.divider()
-        st.subheader("02 · Detail kuantitas")
-        c, d = st.columns(2)
-        with c:
-            qty_fisik = st.number_input("Qty fisik", min_value=0.0, step=1.0, help="Jumlah aktual hasil pengecekan fisik.")
-        with d:
-            qty_ellipse = st.number_input("Qty Ellipse", min_value=0.0, step=1.0, help="Jumlah yang tercatat pada sistem Ellipse.")
-        st.divider()
-        st.subheader("03 · Uraian temuan")
-        description = st.text_area("Jelaskan problem yang ditemukan *", height=140, placeholder="Tuliskan kondisi aktual, lokasi/bin, kronologi pengecekan, dan dampak terhadap operasional.")
-        st.caption("Pastikan uraian singkat, faktual, dan mudah dipahami oleh PIC tindak lanjut.")
-        submit = st.form_submit_button("KIRIM LAPORAN PROBLEM", type="primary", use_container_width=True)
-    if submit:
-        if not wr.strip() or not stockcode.strip() or not description.strip():
-            st.warning("Lengkapi WR, Stockcode, dan uraian problem terlebih dahulu.")
-        elif not stockcode.strip().isdigit():
-            st.warning("Stockcode harus berupa angka.")
-        elif not active_categories:
-            st.warning("Master kategori belum tersedia. Hubungi Warehouse Supervisor.")
-        else:
-            try:
-                result = bank_api("create_problem_ticket", WR=wr.strip(), Stockcode=stockcode.strip(), Qty_Fisik=qty_fisik, Qty_Ellipse=qty_ellipse, Kategori=category, Uraian_Problem=description.strip())
-                if api_success(result):
-                    st.success(f"Laporan berhasil dikirim. Nomor tiket: {result.get('ticket_id')} · Status OPEN")
-                    st.rerun()
+        active_master = {}
+        available_labels = []
+        st.error(f"Master kategori gagal dimuat: {exc}")
+
+    if not available_labels:
+        st.warning("Kategori yang dibutuhkan belum aktif atau SLA belum diatur. Minta Supervisor mengaktifkan Stock Discrepancy, Problem Bin Loc, dan Receiving Problem pada Master Kategori Problem.")
+    else:
+        selected_label = st.selectbox("Pilih kategori problem *", available_labels, key="bp_category_first")
+        selected_category = next(
+            (alias for alias in category_aliases[selected_label] if alias in active_master),
+            selected_label,
+        )
+        receiving_subtype = None
+        if selected_label == "Receiving Problem":
+            # Select subtype di luar form agar Streamlit rerun dan mengganti field secara dinamis.
+            receiving_subtype = st.selectbox("Jenis Receiving Problem *", RECEIVING_TYPES, key="bp_receiving_subtype")
+        with st.form("bank_problem_submit_" + selected_label.replace(" ", "_").lower(), clear_on_submit=True):
+            st.subheader("01 · Detail laporan")
+            payload = {"Kategori": selected_category}
+
+            if selected_label == "Stock Discrepancy":
+                c1, c2 = st.columns(2)
+                with c1:
+                    wr = st.text_input("Work Request (WR) *", key="bp_sd_wr", placeholder="Contoh: WR-2026-00125")
+                    stockcode = st.text_input("Stockcode *", key="bp_sd_stock", placeholder="Nomor stockcode (angka)")
+                    qty_fisik = st.number_input("Qty Fisik *", min_value=0.0, step=1.0, key="bp_sd_qfisik")
+                with c2:
+                    qty_ellipse = st.number_input("Qty Ellipse *", min_value=0.0, step=1.0, key="bp_sd_qellipse")
+                    description = st.text_area("Uraian Problem *", height=125, key="bp_sd_desc", placeholder="Jelaskan selisih dan hasil pengecekan.")
+                payload.update({"WR": wr.strip(), "Stockcode": stockcode.strip(), "Qty_Fisik": qty_fisik, "Qty_Ellipse": qty_ellipse, "Uraian_Problem": description.strip()})
+
+            elif selected_label == "Problem Bin Loc":
+                c1, c2 = st.columns(2)
+                with c1:
+                    wr = st.text_input("Work Request (WR) *", key="bp_bin_wr", placeholder="Nomor WR")
+                    stockcode = st.text_input("Stockcode *", key="bp_bin_stock", placeholder="Nomor stockcode (angka)")
+                    bin_ellipse = st.text_input("Bin Location Ellipse *", key="bp_bin_ellipse", placeholder="Lokasi pada Ellipse")
+                with c2:
+                    bin_actual = st.text_input("Bin Location Aktual *", key="bp_bin_actual", placeholder="Lokasi fisik aktual")
+                    description = st.text_area("Uraian Problem *", height=125, key="bp_bin_desc", placeholder="Jelaskan perbedaan lokasi dan hasil verifikasi.")
+                payload.update({"WR": wr.strip(), "Stockcode": stockcode.strip(), "Bin_Loc_Ellipse": bin_ellipse.strip(), "Bin_Loc_Aktual": bin_actual.strip(), "Uraian_Problem": description.strip()})
+
+            else:
+                stock_code_pr = st.text_input("Stock Code / PR *", key="bp_rcv_stock_pr", placeholder="Stock code atau nomor PR")
+                payload["Stock_Code_PR"] = stock_code_pr.strip()
+                payload["Receiving_Subtype"] = receiving_subtype
+                if receiving_subtype == "Beda Qty":
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        po_number = st.text_input("PO Number *", key="bp_rcv_qty_po")
+                        qty_po = st.number_input("Qty PO *", min_value=0.0, step=1.0, key="bp_rcv_qty_order")
+                    with c2:
+                        qty_received = st.number_input("Qty Diterima *", min_value=0.0, step=1.0, key="bp_rcv_qty_received")
+                        description = st.text_area("Uraian Problem *", height=100, key="bp_rcv_qty_desc")
+                    payload.update({"PO_Number": po_number.strip(), "Qty_PO": qty_po, "Qty_Diterima": qty_received, "Uraian_Problem": description.strip()})
+                elif receiving_subtype == "Beda PO":
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        po_document = st.text_input("Nomor PO Dokumen *", key="bp_rcv_doc_po")
+                    with c2:
+                        po_system = st.text_input("Nomor PO Sistem *", key="bp_rcv_system_po")
+                    description = st.text_area("Uraian Problem *", height=100, key="bp_rcv_po_desc")
+                    payload.update({"PO_Document": po_document.strip(), "PO_System": po_system.strip(), "Uraian_Problem": description.strip()})
                 else:
-                    st.error(result.get("message", "Gagal membuat tiket."))
-            except Exception as exc:
-                st.error(f"Pengiriman tiket gagal: {exc}")
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        po_number = st.text_input("PO Number *", key="bp_rcv_damage_po")
+                        qty_received = st.number_input("Qty Diterima *", min_value=0.0, step=1.0, key="bp_rcv_damage_received")
+                    with c2:
+                        qty_damaged = st.number_input("Qty Rusak *", min_value=0.0, step=1.0, key="bp_rcv_damage_qty")
+                        damage_desc = st.text_area("Deskripsi Kerusakan *", height=100, key="bp_rcv_damage_desc")
+                    payload.update({"PO_Number": po_number.strip(), "Qty_Diterima": qty_received, "Qty_Rusak": qty_damaged, "Uraian_Problem": damage_desc.strip()})
+
+            st.divider()
+            submitted = st.form_submit_button("KIRIM LAPORAN PROBLEM", type="primary", use_container_width=True)
+
+        if submitted:
+            required = []
+            if selected_label == "Stock Discrepancy":
+                required = [("WR", payload.get("WR")), ("Stockcode", payload.get("Stockcode")), ("Uraian Problem", payload.get("Uraian_Problem"))]
+                if payload.get("Stockcode") and not payload["Stockcode"].isdigit():
+                    st.error("Stockcode harus berupa angka.")
+                    required = []
+                    validation_failed = True
+                else:
+                    validation_failed = False
+            elif selected_label == "Problem Bin Loc":
+                required = [(k, payload.get(k)) for k in ["WR", "Stockcode", "Bin_Loc_Ellipse", "Bin_Loc_Aktual", "Uraian_Problem"]]
+                validation_failed = bool(payload.get("Stockcode") and not payload["Stockcode"].isdigit())
+                if validation_failed:
+                    st.error("Stockcode harus berupa angka.")
+            else:
+                required = [("Stock Code / PR", payload.get("Stock_Code_PR")), ("Uraian Problem", payload.get("Uraian_Problem"))]
+                if receiving_subtype == "Beda Qty":
+                    required += [("PO Number", payload.get("PO_Number"))]
+                elif receiving_subtype == "Beda PO":
+                    required += [("Nomor PO Dokumen", payload.get("PO_Document")), ("Nomor PO Sistem", payload.get("PO_System"))]
+                else:
+                    required += [("PO Number", payload.get("PO_Number")), ("Deskripsi Kerusakan", payload.get("Uraian_Problem"))]
+                validation_failed = False
+            missing = [label for label, value in required if value is None or (isinstance(value, str) and not value.strip())]
+            if not validation_failed and missing:
+                st.warning("Lengkapi kolom wajib: " + ", ".join(missing))
+            elif not validation_failed:
+                try:
+                    result = bank_api("create_problem_ticket", **payload)
+                    if api_success(result):
+                        st.success(f"Laporan berhasil dikirim. Nomor tiket: {result.get('ticket_id', '-') } · Status OPEN")
+                        st.rerun()
+                    else:
+                        st.error(result.get("message", "Gagal membuat tiket."))
+                except Exception as exc:
+                    st.error(f"Pengiriman tiket gagal: {exc}")
 
 elif menu == "My Problem Tickets":
     page_heading("WAREHOUSE · TRACKING", "Tiket Saya", "Pantau status dan tindak lanjut dari setiap laporan yang Anda kirim.")
@@ -917,7 +1009,7 @@ elif menu == "My Problem Tickets":
             total, opened, closed = status_counts(dfp)
             m1, m2, m3 = st.columns(3)
             m1.metric("Total laporan", total); m2.metric("Open", opened); m3.metric("Closed", closed)
-            show_cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Kategori", "Status", "PIC", "Updated_Timestamp"] if c in dfp]
+            show_cols = [c for c in ["Ticket_ID", "Timestamp", "WR", "Stockcode", "Stock_Code_PR", "Kategori", "Receiving_Subtype", "PO_Number", "PO_Document", "PO_System", "Qty_Fisik", "Qty_Ellipse", "Qty_PO", "Qty_Diterima", "Qty_Rusak", "Bin_Loc_Ellipse", "Bin_Loc_Aktual", "Status", "PIC", "Updated_Timestamp"] if c in dfp]
             st.dataframe(dfp[show_cols], use_container_width=True, hide_index=True)
             st.download_button("Unduh riwayat tiket (CSV)", dfp.to_csv(index=False).encode("utf-8-sig"), "riwayat_problem_tiket.csv", "text/csv")
     except Exception as exc:
