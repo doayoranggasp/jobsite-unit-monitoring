@@ -416,13 +416,28 @@ with st.sidebar.expander("👤 Profile Saya", expanded=False):
                 st.error(profile_result.get("message", "Gagal memperbarui profile."))
         except Exception as exc:
             st.error(f"Gagal menyimpan profile: {exc}")
-# Portal utama menjadi landing area setelah login. Key v2 memastikan sesi lama
-# yang sebelumnya menyimpan pilihan Unit/Warehouse tidak menghalangi landing page baru.
-module = st.sidebar.radio(
-    "PILIH AREA KERJA",
-    ["Web Portal", "Unit Management", "Warehouse Management"],
-    key="active_module_choice_v2",
-)
+# Portal utama menjadi landing area setelah login. Website tim aktif otomatis
+# ditambahkan sebagai pilihan area kerja tanpa mengubah modul internal yang ada.
+try:
+    _team_result = post_to_webapp({"action": "get_web_links", "active_only": True})
+    if api_success(_team_result):
+        _team_links = [x for x in _team_result.get("web_links", []) if str(x.get("URL", "")).strip().startswith(("https://", "http://"))]
+    else:
+        _team_links = []
+except Exception:
+    _team_links = []
+
+_team_area_map = {}
+for _item in _team_links:
+    _name = str(_item.get("Web_Name", "Aplikasi Tim")).strip() or "Aplikasi Tim"
+    _web_id = str(_item.get("Web_ID", "")).strip()
+    _label = f"🌐 {_name}" if not _web_id else f"🌐 {_name} · {_web_id}"
+    _team_area_map[_label] = _item
+
+_area_options = ["Web Portal", "Unit Management", "Warehouse Management"] + list(_team_area_map.keys())
+if st.session_state.get("active_module_choice_v2") not in _area_options:
+    st.session_state["active_module_choice_v2"] = "Web Portal"
+module = st.sidebar.radio("PILIH AREA KERJA", _area_options, key="active_module_choice_v2")
 unit_pages = ["Dashboard Overview", "Master Jobsite", "Master Data Unit", "Upload / Update Master MSE600", "Form Mob / Demob", "Log Transaksi Permanen"]
 portal_pages = ["Beranda Portal", "Akses Web Tim"]
 # Dashboard temuan dapat dilihat seluruh user Warehouse; menu administrasi tetap khusus supervisor.
@@ -437,9 +452,12 @@ elif module == "Warehouse Management":
     st.sidebar.markdown("### WAREHOUSE WORKSPACE")
     menu = st.sidebar.radio("Navigasi Warehouse", warehouse_pages, key="warehouse_navigation")
     st.sidebar.caption("CREW dan SUPERVISOR dapat melakukan follow up serta menutup temuan.")
-else:
+elif module == "Unit Management":
     st.sidebar.markdown("### FLEET WORKSPACE")
     menu = st.sidebar.radio("Navigasi Unit", unit_pages, key="unit_navigation")
+else:
+    menu = "__TEAM_WEB_SELECTED__"
+    st.sidebar.caption("Website tim dipilih. Login dilakukan pada website tujuan.")
 st.sidebar.markdown("---")
 if st.sidebar.button("↻  Refresh Data", use_container_width=True):
     st.cache_data.clear()
@@ -562,7 +580,7 @@ elif menu == "Kelola Web Tim":
         web_name = st.text_input("Nama aplikasi / web *", placeholder="Contoh: Monitoring PO")
         web_url = st.text_input("URL aplikasi *", placeholder="https://...")
         web_category = st.selectbox("Kategori", ["Fleet", "Warehouse", "Inventory", "Procurement", "Dashboard", "Lainnya"])
-        web_description = st.text_area("Deskripsi singkat", placeholder="Fungsi dan pengguna aplikasi")
+        web_description = st.text_input("Deskripsi singkat", placeholder="Fungsi dan pengguna aplikasi")
         submitted = st.form_submit_button("TAMBAHKAN WEB KE PORTAL", type="primary", use_container_width=True)
     if submitted:
         if not web_name.strip() or not web_url.strip():
@@ -583,7 +601,7 @@ elif menu == "Kelola Web Tim":
         if not api_success(listed): raise RuntimeError(listed.get("message", "Gagal memuat data."))
         rows = listed.get("web_links", [])
         if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.table(pd.DataFrame(rows))
             options = {f"{x.get('Web_Name')} · {x.get('URL')}": x for x in rows if str(x.get("Active", "TRUE")).upper() not in ["FALSE", "0", "NO"]}
             if options:
                 chosen = st.selectbox("Nonaktifkan aplikasi", list(options.keys()))
@@ -595,6 +613,22 @@ elif menu == "Kelola Web Tim":
                     else: st.error(resp.get("message", "Gagal menonaktifkan web."))
         else: st.info("Belum ada web yang terdaftar.")
     except Exception as exc: st.error(f"Daftar web gagal dimuat: {exc}")
+
+# =========================================================
+# SELECTED TEAM WEBSITE - WORK AREA ENTRY
+# =========================================================
+if menu == "__TEAM_WEB_SELECTED__":
+    _selected_web = _team_area_map.get(module, {})
+    _selected_name = str(_selected_web.get("Web_Name", "Website Tim"))
+    _selected_url = str(_selected_web.get("URL", "")).strip()
+    _selected_desc = str(_selected_web.get("Description", "") or "Aplikasi eksternal tim.")
+    page_heading("TEAM WORKSPACE · EXTERNAL APPLICATION", _selected_name, _selected_desc)
+    st.info("Website ini terdaftar sebagai area kerja. Demi keamanan, akun dan sesi login tetap dikelola oleh website tujuan.")
+    if _selected_url.startswith(("https://", "http://")):
+        st.link_button("BUKA " + _selected_name.upper() + " ↗", _selected_url, type="primary", use_container_width=True)
+        st.caption("Tautan dibuka di tab browser baru. Sebagian website memblokir penyematan di dalam aplikasi (iframe), sehingga portal menggunakan akses langsung yang lebih kompatibel.")
+    else:
+        st.error("URL website tidak valid. Minta Supervisor memperbarui URL melalui Kelola Web Tim.")
 
 # =========================================================
 # 1. DASHBOARD OVERVIEW
