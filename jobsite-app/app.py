@@ -159,23 +159,18 @@ def get_worksheet_id(key):
 
 
 def load_branding_assets():
-    """Baca konfigurasi logo dan background dari worksheet App_Assets."""
-    conn = get_gsheets_connection()
-    if conn is None:
-        return pd.DataFrame(columns=["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"])
-    gid = get_worksheet_id("branding_assets_gid")
-    try:
-        df = conn.read(worksheet=gid, ttl=60)
-    except Exception:
-        # Worksheet baru mungkin belum memiliki header/data.
-        return pd.DataFrame(columns=["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"])
-    if df is None or df.empty:
-        return pd.DataFrame(columns=["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"])
-    df.columns = [str(c).strip() for c in df.columns]
-    for col in ["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"]:
-        if col not in df.columns:
-            df[col] = ""
-    return df[["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"]].fillna("")
+    """Baca konfigurasi logo/background melalui Apps Script (bukan GSheets public read-only)."""
+    result = post_to_webapp({"action": "get_branding_assets"})
+    if not api_success(result):
+        raise RuntimeError(result.get("message", "Gagal memuat konfigurasi branding."))
+    frame = pd.DataFrame(result.get("assets", []))
+    columns = ["Asset_Key", "Asset_URL", "Active", "Updated_By", "Updated_At"]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+    for col in columns:
+        if col not in frame.columns:
+            frame[col] = ""
+    return frame[columns].fillna("")
 
 
 def get_branding_url(asset_key):
@@ -198,18 +193,17 @@ def get_branding_url(asset_key):
 
 
 def save_branding_assets(logo_url, background_url):
-    """Simpan dua aset branding ke worksheet App_Assets."""
-    conn = get_gsheets_connection()
-    if conn is None:
-        raise RuntimeError("Koneksi Google Sheets tidak tersedia.")
-    gid = get_worksheet_id("branding_assets_gid")
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    rows = pd.DataFrame([
-        {"Asset_Key": "COMPANY_LOGO", "Asset_URL": logo_url.strip(), "Active": "TRUE", "Updated_By": st.session_state.username, "Updated_At": now},
-        {"Asset_Key": "APP_BACKGROUND", "Asset_URL": background_url.strip(), "Active": "TRUE", "Updated_By": st.session_state.username, "Updated_At": now},
-    ])
-    conn.update(worksheet=gid, data=rows)
+    """Simpan branding melalui Apps Script agar tidak memerlukan service account GSheets."""
+    result = post_to_webapp({
+        "action": "save_branding_assets",
+        "logo_url": logo_url.strip(),
+        "background_url": background_url.strip(),
+        "username": st.session_state.get("username", ""),
+    })
+    if not api_success(result):
+        raise RuntimeError(result.get("message", "Gagal menyimpan branding."))
     st.cache_data.clear()
+    return result
 
 
 def clean_text_series(series):
@@ -422,13 +416,24 @@ with st.sidebar.expander("👤 Profile Saya", expanded=False):
                 st.error(profile_result.get("message", "Gagal memperbarui profile."))
         except Exception as exc:
             st.error(f"Gagal menyimpan profile: {exc}")
-module = st.sidebar.radio("PILIH AREA KERJA", ["Unit Management", "Warehouse Management"], key="active_module_choice")
+# Portal utama menjadi landing area setelah login. Key v2 memastikan sesi lama
+# yang sebelumnya menyimpan pilihan Unit/Warehouse tidak menghalangi landing page baru.
+module = st.sidebar.radio(
+    "PILIH AREA KERJA",
+    ["Web Portal", "Unit Management", "Warehouse Management"],
+    key="active_module_choice_v2",
+)
 unit_pages = ["Dashboard Overview", "Master Jobsite", "Master Data Unit", "Upload / Update Master MSE600", "Form Mob / Demob", "Log Transaksi Permanen"]
+portal_pages = ["Beranda Portal", "Akses Web Tim"]
 # Dashboard temuan dapat dilihat seluruh user Warehouse; menu administrasi tetap khusus supervisor.
 warehouse_pages = ["Bank Problem Dashboard", "Submit Bank Problem", "My Problem Tickets", "Follow Up Temuan"]
 if is_supervisor:
     warehouse_pages += ["Master Kategori Problem", "Problem Analysis", "Branding & Tampilan"]
-if module == "Warehouse Management":
+    portal_pages += ["Kelola Web Tim"]
+if module == "Web Portal":
+    st.sidebar.markdown("### WEB PORTAL UTAMA")
+    menu = st.sidebar.radio("Navigasi Web", portal_pages, key="web_portal_navigation")
+elif module == "Warehouse Management":
     st.sidebar.markdown("### WAREHOUSE WORKSPACE")
     menu = st.sidebar.radio("Navigasi Warehouse", warehouse_pages, key="warehouse_navigation")
     st.sidebar.caption("CREW dan SUPERVISOR dapat melakukan follow up serta menutup temuan.")
@@ -445,6 +450,148 @@ if st.sidebar.button("Keluar", use_container_width=True):
     st.session_state.user_role = "CREW"
     st.rerun()
 
+
+# =========================================================
+# WEB PORTAL - CENTRAL LANDING PAGE
+# =========================================================
+def switch_portal_module(target):
+    # Callback dijalankan sebelum rerun, aman untuk mengubah nilai widget radio.
+    st.session_state["active_module_choice_v2"] = target
+
+
+def switch_portal_page(target):
+    st.session_state["web_portal_navigation"] = target
+
+
+if menu == "Beranda Portal":
+    page_heading(
+        "CENTRAL OPERATIONS PORTAL",
+        "Pusat Aplikasi Operasional",
+        "Satu pintu untuk menemukan dan membuka sistem operasional. Setiap aplikasi tim tetap menggunakan akun login masing-masing.",
+    )
+    st.markdown(
+        "<div class='section-card'><h3>Selamat datang di Main Portal</h3>"
+        "<p>Portal ini berfungsi sebagai direktori dan titik masuk aplikasi. "
+        "Login, data, serta hak akses di website tim tetap dikelola oleh masing-masing aplikasi.</p></div>",
+        unsafe_allow_html=True,
+    )
+    st.subheader("Aplikasi utama")
+    c1, c2 = st.columns(2)
+    with c1:
+        with st.container(border=True):
+            st.markdown("### 🚜 Unit / Fleet Management")
+            st.write("Dashboard fleet, Master Jobsite, Master Data Unit, dan transaksi MOB/DEMOB.")
+            st.button("BUKA FLEET MANAGEMENT", key="portal_open_fleet", type="primary", use_container_width=True,
+                       on_click=switch_portal_module, args=("Unit Management",))
+    with c2:
+        with st.container(border=True):
+            st.markdown("### 📦 Warehouse Management")
+            st.write("Bank Problem, tiket temuan, follow up, analisis, dan branding.")
+            st.button("BUKA WAREHOUSE MANAGEMENT", key="portal_open_warehouse", type="primary", use_container_width=True,
+                       on_click=switch_portal_module, args=("Warehouse Management",))
+
+    st.divider()
+    st.subheader("Aplikasi tim yang terdaftar")
+    try:
+        portal_result = post_to_webapp({"action": "get_web_links", "active_only": True})
+        if not api_success(portal_result):
+            raise RuntimeError(portal_result.get("message", "Gagal memuat direktori web tim."))
+        portal_links = portal_result.get("web_links", [])
+        if not portal_links:
+            st.info("Belum ada website tim yang terdaftar. Supervisor dapat menambahkannya melalui Kelola Web Tim.")
+        else:
+            st.caption(f"Terdapat {len(portal_links)} aplikasi tim aktif. Login website dilakukan masing-masing setelah aplikasi dibuka.")
+            preview_cols = st.columns(3)
+            for idx, item in enumerate(portal_links[:6]):
+                with preview_cols[idx % 3]:
+                    with st.container(border=True):
+                        st.markdown(f"**{str(item.get('Web_Name', 'Aplikasi Tim'))}**")
+                        st.caption(str(item.get("Category", "Umum")))
+                        st.write(str(item.get("Description", "Tidak ada deskripsi.")))
+                        target_url = str(item.get("URL", "")).strip()
+                        if target_url.startswith(("https://", "http://")):
+                            st.link_button("BUKA APLIKASI ↗", target_url, use_container_width=True)
+                        else:
+                            st.error("URL aplikasi tidak valid.")
+            if len(portal_links) > 6:
+                st.caption(f"{len(portal_links)-6} aplikasi lainnya tersedia di menu Akses Web Tim.")
+        st.button("LIHAT SEMUA WEB TIM", key="portal_all_team_webs", use_container_width=True,
+                   on_click=switch_portal_page, args=("Akses Web Tim",))
+    except Exception as exc:
+        st.warning(f"Direktori web tim belum dapat dimuat: {exc}")
+
+# =========================================================
+# WEB PORTAL - AKSES DAN DIREKTORI WEB TIM
+# =========================================================
+elif menu == "Akses Web Tim":
+    page_heading("MAIN PORTAL · TEAM APPLICATIONS", "Akses Web Tim", "Satu pintu untuk membuka aplikasi utama dan seluruh aplikasi yang dikembangkan oleh tim.")
+    try:
+        result = post_to_webapp({"action": "get_web_links", "active_only": True})
+        if not api_success(result):
+            raise RuntimeError(result.get("message", "Gagal memuat daftar web."))
+        links = result.get("web_links", [])
+        if not links:
+            st.info("Belum ada web tim yang terdaftar. Hubungi Supervisor/Admin untuk menambahkan aplikasi.")
+        else:
+            search = st.text_input("Cari aplikasi / web", placeholder="Masukkan nama aplikasi atau kategori")
+            categories = sorted(set(str(x.get("Category", "Umum") or "Umum") for x in links))
+            selected_category = st.selectbox("Kategori aplikasi", ["Semua"] + categories)
+            filtered = [x for x in links if (selected_category == "Semua" or str(x.get("Category", "Umum") or "Umum") == selected_category) and (not search.strip() or search.lower() in (str(x.get("Web_Name", "")) + " " + str(x.get("Description", "")) + " " + str(x.get("Category", ""))).lower())]
+            cols = st.columns(2)
+            for i, item in enumerate(filtered):
+                with cols[i % 2]:
+                    with st.container(border=True):
+                        st.subheader(str(item.get("Web_Name", "Aplikasi Tim")))
+                        st.caption(str(item.get("Category", "Umum")))
+                        st.write(str(item.get("Description", "Tidak ada deskripsi.")))
+                        url = str(item.get("URL", "")).strip()
+                        if url.startswith("https://") or url.startswith("http://"):
+                            st.link_button("BUKA APLIKASI ↗", url, use_container_width=True)
+                        else:
+                            st.error("URL aplikasi tidak valid.")
+            st.caption(f"Menampilkan {len(filtered)} dari {len(links)} aplikasi aktif.")
+    except Exception as exc:
+        st.error(f"Portal web gagal dimuat: {exc}")
+
+elif menu == "Kelola Web Tim":
+    page_heading("MAIN PORTAL · ADMIN", "Kelola Web Tim", "Daftarkan aplikasi, dashboard, atau website tim agar dapat diakses melalui portal utama.")
+    with st.form("add_team_web_form", clear_on_submit=True):
+        web_name = st.text_input("Nama aplikasi / web *", placeholder="Contoh: Monitoring PO")
+        web_url = st.text_input("URL aplikasi *", placeholder="https://...")
+        web_category = st.selectbox("Kategori", ["Fleet", "Warehouse", "Inventory", "Procurement", "Dashboard", "Lainnya"])
+        web_description = st.text_area("Deskripsi singkat", placeholder="Fungsi dan pengguna aplikasi")
+        submitted = st.form_submit_button("TAMBAHKAN WEB KE PORTAL", type="primary", use_container_width=True)
+    if submitted:
+        if not web_name.strip() or not web_url.strip():
+            st.warning("Nama aplikasi dan URL wajib diisi.")
+        elif not web_url.strip().startswith(("https://", "http://")):
+            st.warning("URL harus diawali https:// atau http://")
+        else:
+            try:
+                saved = post_to_webapp({"action":"add_web_link", "Web_Name":web_name.strip(), "URL":web_url.strip(), "Category":web_category, "Description":web_description.strip(), "username":st.session_state.username, "user_role":st.session_state.user_role})
+                if api_success(saved):
+                    st.success(saved.get("message", "Web berhasil ditambahkan.")); st.rerun()
+                else: st.error(saved.get("message", "Gagal menambahkan web."))
+            except Exception as exc: st.error(f"Gagal menyimpan web: {exc}")
+    st.divider()
+    st.subheader("Daftar web terdaftar")
+    try:
+        listed = post_to_webapp({"action":"get_web_links", "active_only":False})
+        if not api_success(listed): raise RuntimeError(listed.get("message", "Gagal memuat data."))
+        rows = listed.get("web_links", [])
+        if rows:
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            options = {f"{x.get('Web_Name')} · {x.get('URL')}": x for x in rows if str(x.get("Active", "TRUE")).upper() not in ["FALSE", "0", "NO"]}
+            if options:
+                chosen = st.selectbox("Nonaktifkan aplikasi", list(options.keys()))
+                confirm = st.checkbox("Saya yakin ingin menonaktifkan aplikasi ini.")
+                if st.button("NONAKTIFKAN WEB TERPILIH", disabled=not confirm):
+                    x = options[chosen]
+                    resp = post_to_webapp({"action":"set_web_link_active", "Web_ID":x.get("Web_ID"), "Active":False, "username":st.session_state.username, "user_role":st.session_state.user_role})
+                    if api_success(resp): st.success("Aplikasi dinonaktifkan dari portal."); st.rerun()
+                    else: st.error(resp.get("message", "Gagal menonaktifkan web."))
+        else: st.info("Belum ada web yang terdaftar.")
+    except Exception as exc: st.error(f"Daftar web gagal dimuat: {exc}")
 
 # =========================================================
 # 1. DASHBOARD OVERVIEW
