@@ -430,8 +430,8 @@ except Exception:
 _team_area_map = {}
 for _item in _team_links:
     _name = str(_item.get("Web_Name", "Aplikasi Tim")).strip() or "Aplikasi Tim"
-    _web_id = str(_item.get("Web_ID", "")).strip()
-    _label = f"🌐 {_name}" if not _web_id else f"🌐 {_name} · {_web_id}"
+    # Tampilkan judul aplikasi saja; Web_ID tetap disimpan internal untuk operasi backend.
+    _label = f"🌐 {_name}"
     _team_area_map[_label] = _item
 
 _area_options = ["Web Portal", "Unit Management", "Warehouse Management"] + list(_team_area_map.keys())
@@ -601,8 +601,17 @@ elif menu == "Kelola Web Tim":
         if not api_success(listed): raise RuntimeError(listed.get("message", "Gagal memuat data."))
         rows = listed.get("web_links", [])
         if rows:
-            st.table(pd.DataFrame(rows))
-            options = {f"{x.get('Web_Name')} · {x.get('URL')}": x for x in rows if str(x.get("Active", "TRUE")).upper() not in ["FALSE", "0", "NO"]}
+            # Web_ID tidak ditampilkan kepada pengguna; tetap dipakai secara internal saat update.
+            _display_rows = [
+                {"Judul Aplikasi": x.get("Web_Name", ""),
+                 "Kategori": x.get("Category", ""),
+                 "Deskripsi": x.get("Description", ""),
+                 "URL": x.get("URL", ""),
+                 "Status": "Aktif" if str(x.get("Active", "TRUE")).upper() not in ["FALSE", "0", "NO"] else "Nonaktif"}
+                for x in rows
+            ]
+            st.dataframe(pd.DataFrame(_display_rows), use_container_width=True, hide_index=True)
+            options = {str(x.get('Web_Name', 'Aplikasi Tim')): x for x in rows if str(x.get("Active", "TRUE")).upper() not in ["FALSE", "0", "NO"]}
             if options:
                 chosen = st.selectbox("Nonaktifkan aplikasi", list(options.keys()))
                 confirm = st.checkbox("Saya yakin ingin menonaktifkan aplikasi ini.")
