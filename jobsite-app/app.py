@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import requests
 from datetime import datetime, timezone
 import uuid
@@ -19,31 +18,41 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    :root { --navy:#14243a; --blue:#1769aa; --ink:#172b4d; --muted:#66758a; --line:#e5eaf1; --surface:#ffffff; --canvas:#f3f6fa; }
+    :root { --navy:#10263f; --navy2:#183b5b; --blue:#1769aa; --gold:#c9a45c; --ink:#172b4d; --muted:#68788b; --line:#e5eaf1; --surface:#ffffff; --canvas:#f4f6f8; }
     .stApp { background:var(--canvas); color:var(--ink); }
-    [data-testid="stHeader"] { background:rgba(243,246,250,.92); }
-    [data-testid="stSidebar"] { background:#14243a; border-right:1px solid #263a55; }
-    [data-testid="stSidebar"] * { color:#edf3fb !important; }
-    [data-testid="stSidebar"] [data-testid="stRadio"] label { padding:7px 10px; border-radius:8px; }
-    [data-testid="stSidebar"] [data-testid="stRadio"] label:hover { background:#263d5b; }
-    [data-testid="stSidebar"] hr { border-color:#344963; }
-    [data-testid="stSidebar"] .stButton button { background:#2677c9; border:0; color:white !important; }
-    .block-container { max-width:1500px; padding-top:2rem; padding-bottom:3rem; }
-    h1,h2,h3 { color:#172b4d; letter-spacing:-.02em; }
-    h1 { font-weight:750; }
-    [data-testid="stMetric"] { background:#fff; border:1px solid var(--line); padding:17px 18px; border-radius:13px; box-shadow:0 2px 8px rgba(20,36,58,.04); }
-    [data-testid="stMetricLabel"] { color:#66758a; font-weight:600; }
-    [data-testid="stMetricValue"] { color:#172b4d; font-weight:750; }
-    [data-testid="stForm"] { background:#fff; border:1px solid var(--line); padding:22px; border-radius:14px; }
+    [data-testid="stHeader"] { background:rgba(244,246,248,.94); }
+    [data-testid="stSidebar"] { background:linear-gradient(180deg,#10263f 0%,#183b5b 100%); border-right:1px solid #294963; }
+    [data-testid="stSidebar"] * { color:#f3f6fa !important; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label { padding:9px 11px; border-radius:8px; transition:background .18s ease; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label:hover { background:rgba(255,255,255,.12); }
+    [data-testid="stSidebar"] hr { border-color:#496178; }
+    [data-testid="stSidebar"] .stButton button { background:var(--gold); border:0; color:#10263f !important; font-weight:800; }
+    .block-container { max-width:1500px; padding-top:1.35rem; padding-bottom:3rem; }
+    h1,h2,h3 { color:#142d47; letter-spacing:-.025em; }
+    h1 { font-weight:800; }
+    h2 { font-weight:760; }
+    [data-testid="stMetric"] { background:#fff; border:1px solid var(--line); padding:17px 18px; border-radius:5px 13px 13px 13px; box-shadow:0 3px 12px rgba(16,38,63,.045); border-top:3px solid var(--gold); }
+    [data-testid="stMetricLabel"] { color:#68788b; font-weight:650; }
+    [data-testid="stMetricValue"] { color:#142d47; font-weight:800; }
+    [data-testid="stForm"] { background:#fff; border:1px solid var(--line); padding:22px; border-radius:12px; }
     [data-testid="stDataFrame"] { background:#fff; border:1px solid var(--line); border-radius:12px; }
-    .page-eyebrow { color:#1769aa; text-transform:uppercase; letter-spacing:.12em; font-size:.76rem; font-weight:800; margin-bottom:.35rem; }
-    .page-subtitle { color:#66758a; margin-top:-.55rem; margin-bottom:1.3rem; }
-    .section-card { background:#fff; border:1px solid #e5eaf1; border-radius:14px; padding:18px 20px; margin:10px 0 16px; }
+    .page-eyebrow { color:#9b7838; text-transform:uppercase; letter-spacing:.16em; font-size:.72rem; font-weight:850; margin-bottom:.45rem; }
+    .page-subtitle { color:#68788b; margin-top:-.55rem; margin-bottom:1.3rem; }
+    .section-card { background:#fff; border:1px solid #e5eaf1; border-left:4px solid var(--gold); border-radius:4px 12px 12px 4px; padding:19px 21px; margin:10px 0 16px; box-shadow:0 3px 12px rgba(16,38,63,.035); }
     .section-card h3 { margin:0 0 5px 0; font-size:1.05rem; }
-    .section-card p { color:#66758a; margin:0; font-size:.9rem; }
-    .stButton button, .stFormSubmitButton button { border-radius:9px; font-weight:650; min-height:2.55rem; }
-    .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] { border-radius:8px; }
-    div[data-testid="stAlert"] { border-radius:10px; }
+    .section-card p { color:#68788b; margin:0; font-size:.92rem; }
+    .kpp-hero { position:relative; overflow:hidden; min-height:270px; padding:42px 42px 36px; margin:4px 0 26px; border-radius:3px 18px 3px 18px; color:#fff; background:linear-gradient(110deg,rgba(10,31,51,.97) 0%,rgba(18,54,81,.88) 58%,rgba(18,54,81,.58) 100%),linear-gradient(135deg,#10263f,#35617d); box-shadow:0 14px 34px rgba(16,38,63,.16); }
+    .kpp-hero:after { content:''; position:absolute; right:-70px; bottom:-180px; width:440px; height:440px; border:1px solid rgba(201,164,92,.38); border-radius:50%; box-shadow:0 0 0 34px rgba(201,164,92,.06),0 0 0 70px rgba(201,164,92,.04); }
+    .kpp-hero .hero-kicker { color:#e0c58e; font-size:.75rem; font-weight:850; letter-spacing:.18em; text-transform:uppercase; margin-bottom:14px; }
+    .kpp-hero h1 { color:#fff !important; font-size:clamp(2rem,4vw,3.15rem); line-height:1.08; max-width:760px; margin:0 0 13px; }
+    .kpp-hero p { color:#e2eaf1; font-size:1rem; max-width:700px; line-height:1.65; margin:0; }
+    .portal-section-label { color:#9b7838; text-transform:uppercase; letter-spacing:.14em; font-size:.72rem; font-weight:850; margin:24px 0 7px; }
+    div[data-testid="stVerticalBlockBorderWrapper"] { border-radius:12px; border-color:#e3e8ed; box-shadow:0 3px 12px rgba(16,38,63,.035); }
+    .stButton button, .stFormSubmitButton button, .stLinkButton a { border-radius:7px; font-weight:750; min-height:2.55rem; }
+    .stButton button[kind="primary"], .stFormSubmitButton button[kind="primary"] { background:#173b5a; border-color:#173b5a; }
+    .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] { border-radius:7px; }
+    div[data-testid="stAlert"] { border-radius:9px; }
+    @media (max-width: 700px) { .kpp-hero { padding:28px 22px; min-height:230px; } .block-container { padding-top:1rem; } }
     </style>
     """,
     unsafe_allow_html=True,
@@ -122,6 +131,15 @@ def api_success(result):
     """Mendukung format respons backend result=success."""
     return str(result.get("result", "")).strip().lower() == "success"
 
+@st.cache_data(ttl=60, show_spinner=False)
+def load_web_links(active_only=True):
+    """Cache direktori web tim agar tidak memanggil Apps Script pada setiap rerun."""
+    result = post_to_webapp({"action": "get_web_links", "active_only": bool(active_only)})
+    if not api_success(result):
+        raise RuntimeError(result.get("message", "Gagal memuat direktori web tim."))
+    links = result.get("web_links", [])
+    return links if isinstance(links, list) else []
+
 
 @st.cache_data(ttl=60, show_spinner="Memuat Master Jobsite...")
 def load_jobsite_names():
@@ -133,6 +151,7 @@ def load_jobsite_names():
     return sorted({str(x).strip() for x in names if str(x).strip()}, key=str.casefold)
 
 
+@st.cache_resource(show_spinner=False)
 def get_gsheets_connection():
     try:
         return st.connection("gsheets", type=GSheetsConnection)
@@ -158,6 +177,7 @@ def get_worksheet_id(key):
         ) from exc
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_branding_assets():
     """Baca konfigurasi logo/background melalui Apps Script (bukan GSheets public read-only)."""
     result = post_to_webapp({"action": "get_branding_assets"})
@@ -289,7 +309,9 @@ if not st.session_state.logged_in:
 # =========================================================
 @st.cache_data(ttl=300, show_spinner="Memuat master data MSE600...")
 def load_master_from_cloud():
-    conn = st.connection("gsheets", type=GSheetsConnection)
+    conn = get_gsheets_connection()
+    if conn is None:
+        raise RuntimeError("Koneksi Google Sheets tidak tersedia.")
 
     # Baca sebagai data mentah agar baris header bisa dicari.
     raw = conn.read(worksheet=get_worksheet_id("mse600_gid"), ttl=0, header=None)
@@ -419,13 +441,10 @@ with st.sidebar.expander("👤 Profile Saya", expanded=False):
 # Portal utama menjadi landing area setelah login. Website tim aktif otomatis
 # ditambahkan sebagai pilihan area kerja tanpa mengubah modul internal yang ada.
 try:
-    _team_result = post_to_webapp({"action": "get_web_links", "active_only": True})
-    if api_success(_team_result):
-        _team_links = [x for x in _team_result.get("web_links", []) if str(x.get("URL", "")).strip().startswith(("https://", "http://"))]
-    else:
-        _team_links = []
-except Exception:
+    _team_links = [x for x in load_web_links(True) if str(x.get("URL", "")).strip().startswith(("https://", "http://"))]
+except Exception as exc:
     _team_links = []
+    st.sidebar.caption("Direktori web tim sementara tidak tersedia.")
 
 _team_area_map = {}
 for _item in _team_links:
@@ -485,18 +504,23 @@ def page_heading(eyebrow, title, subtitle):
     st.markdown(f'<div class="page-eyebrow">{eyebrow}</div><h1>{title}</h1><div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
 
 if menu == "Beranda Portal":
-    page_heading(
-        "CENTRAL OPERATIONS PORTAL",
-        "Pusat Aplikasi Operasional",
-        "Satu pintu untuk menemukan dan membuka sistem operasional. Setiap aplikasi tim tetap menggunakan akun login masing-masing.",
-    )
     st.markdown(
-        "<div class='section-card'><h3>Selamat datang di Main Portal</h3>"
-        "<p>Portal ini berfungsi sebagai direktori dan titik masuk aplikasi. "
-        "Login, data, serta hak akses di website tim tetap dikelola oleh masing-masing aplikasi.</p></div>",
+        "<section class='kpp-hero'>"
+        "<div class='hero-kicker'>JOBsite fleet · operations portal</div>"
+        "<h1>Driving Operational Excellence, Together.</h1>"
+        "<p>One access point for fleet, warehouse, and team applications. "
+        "Built to support safer, faster, and more connected mining operations.</p>"
+        "</section>",
         unsafe_allow_html=True,
     )
-    st.subheader("Aplikasi utama")
+    st.markdown(
+        "<div class='section-card'><h3>Selamat datang di Operations Portal</h3>"
+        "<p>Gunakan portal ini untuk mengakses sistem operasional sesuai area kerja. "
+        "Setiap aplikasi eksternal tetap menggunakan akun dan hak akses masing-masing.</p></div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div class='portal-section-label'>Operations ecosystem</div>", unsafe_allow_html=True)
+    st.subheader("Pilih sistem utama")
     c1, c2 = st.columns(2)
     with c1:
         with st.container(border=True):
@@ -512,12 +536,10 @@ if menu == "Beranda Portal":
                        on_click=switch_portal_module, args=("Warehouse Management",))
 
     st.divider()
+    st.markdown("<div class='portal-section-label'>Connected team applications</div>", unsafe_allow_html=True)
     st.subheader("Aplikasi tim yang terdaftar")
     try:
-        portal_result = post_to_webapp({"action": "get_web_links", "active_only": True})
-        if not api_success(portal_result):
-            raise RuntimeError(portal_result.get("message", "Gagal memuat direktori web tim."))
-        portal_links = portal_result.get("web_links", [])
+        portal_links = load_web_links(True)
         if not portal_links:
             st.info("Belum ada website tim yang terdaftar. Supervisor dapat menambahkannya melalui Kelola Web Tim.")
         else:
@@ -547,10 +569,7 @@ if menu == "Beranda Portal":
 elif menu == "Akses Web Tim":
     page_heading("MAIN PORTAL · TEAM APPLICATIONS", "Akses Web Tim", "Satu pintu untuk membuka aplikasi utama dan seluruh aplikasi yang dikembangkan oleh tim.")
     try:
-        result = post_to_webapp({"action": "get_web_links", "active_only": True})
-        if not api_success(result):
-            raise RuntimeError(result.get("message", "Gagal memuat daftar web."))
-        links = result.get("web_links", [])
+        links = load_web_links(True)
         if not links:
             st.info("Belum ada web tim yang terdaftar. Hubungi Supervisor/Admin untuk menambahkan aplikasi.")
         else:
@@ -591,15 +610,14 @@ elif menu == "Kelola Web Tim":
             try:
                 saved = post_to_webapp({"action":"add_web_link", "Web_Name":web_name.strip(), "URL":web_url.strip(), "Category":web_category, "Description":web_description.strip(), "username":st.session_state.username, "user_role":st.session_state.user_role})
                 if api_success(saved):
+                    load_web_links.clear()
                     st.success(saved.get("message", "Web berhasil ditambahkan.")); st.rerun()
                 else: st.error(saved.get("message", "Gagal menambahkan web."))
             except Exception as exc: st.error(f"Gagal menyimpan web: {exc}")
     st.divider()
     st.subheader("Daftar web terdaftar")
     try:
-        listed = post_to_webapp({"action":"get_web_links", "active_only":False})
-        if not api_success(listed): raise RuntimeError(listed.get("message", "Gagal memuat data."))
-        rows = listed.get("web_links", [])
+        rows = load_web_links(False)
         if rows:
             # Web_ID tidak ditampilkan kepada pengguna; tetap dipakai secara internal saat update.
             _display_rows = [
@@ -618,7 +636,9 @@ elif menu == "Kelola Web Tim":
                 if st.button("NONAKTIFKAN WEB TERPILIH", disabled=not confirm):
                     x = options[chosen]
                     resp = post_to_webapp({"action":"set_web_link_active", "Web_ID":x.get("Web_ID"), "Active":False, "username":st.session_state.username, "user_role":st.session_state.user_role})
-                    if api_success(resp): st.success("Aplikasi dinonaktifkan dari portal."); st.rerun()
+                    if api_success(resp):
+                        load_web_links.clear()
+                        st.success("Aplikasi dinonaktifkan dari portal."); st.rerun()
                     else: st.error(resp.get("message", "Gagal menonaktifkan web."))
         else: st.info("Belum ada web yang terdaftar.")
     except Exception as exc: st.error(f"Daftar web gagal dimuat: {exc}")
@@ -643,6 +663,7 @@ if menu == "__TEAM_WEB_SELECTED__":
 # 1. DASHBOARD OVERVIEW
 # =========================================================
 if menu == "Dashboard Overview":
+    import plotly.express as px
     st.title("Dashboard Fleet & Operational Overview")
     st.caption("Filter dashboard mengikuti data aktual pada Master MSE600, termasuk Status_Description.")
 
@@ -992,14 +1013,24 @@ elif menu == "Log Transaksi Permanen":
 # WAREHOUSE MANAGEMENT - BANK PROBLEM TICKETING
 # =========================================================
 def bank_api(action, **kwargs):
-    return post_to_webapp({"action": action, "username": st.session_state.username, "user_role": st.session_state.user_role, **kwargs})
+    result = post_to_webapp({"action": action, "username": st.session_state.username, "user_role": st.session_state.user_role, **kwargs})
+    # Setiap perubahan tiket/kategori membatalkan cache agar data terbaru langsung terlihat.
+    if not str(action).startswith("get_"):
+        try:
+            load_problem_categories.clear()
+            load_problem_tickets.clear()
+        except NameError:
+            pass
+    return result
 
+@st.cache_data(ttl=120, show_spinner=False)
 def load_problem_categories():
     r = bank_api("get_problem_categories")
     if not api_success(r):
         raise RuntimeError(r.get("message", "Gagal memuat kategori"))
     return r.get("categories", [])
 
+@st.cache_data(ttl=15, show_spinner=False)
 def load_problem_tickets(own_only=False):
     r = bank_api("get_problem_tickets", own_only=own_only)
     if not api_success(r):
@@ -1206,6 +1237,7 @@ elif menu == "My Problem Tickets":
         st.error(str(exc))
 
 elif menu == "Bank Problem Dashboard":
+    import plotly.express as px
     page_heading("WAREHOUSE · PERFORMANCE", "Dashboard Temuan Warehouse & Aging SLA", "Monitoring tanpa toleransi: seluruh tiket berstatus OPEN dihitung sejak timestamp dibuat hingga ditutup.")
     try:
         dfp = load_problem_tickets(False)
@@ -1372,6 +1404,7 @@ elif menu == "Master Kategori Problem":
         st.error(str(exc))
 
 elif menu == "Problem Analysis":
+    import plotly.express as px
     page_heading("WAREHOUSE · ANALYTICS", "Analisis Problem", "Identifikasi pola temuan untuk menentukan prioritas perbaikan inventory dan warehouse.")
     try:
         dfp = load_problem_tickets(False)
