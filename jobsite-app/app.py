@@ -463,6 +463,9 @@ def switch_portal_page(target):
     st.session_state["web_portal_navigation"] = target
 
 
+def page_heading(eyebrow, title, subtitle):
+    st.markdown(f'<div class="page-eyebrow">{eyebrow}</div><h1>{title}</h1><div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
+
 if menu == "Beranda Portal":
     page_heading(
         "CENTRAL OPERATIONS PORTAL",
@@ -963,9 +966,6 @@ def load_problem_tickets(own_only=False):
     if not frame.empty and "Status" in frame.columns:
         frame["Status"] = frame["Status"].fillna("").astype(str).str.strip().str.upper().replace({"IN PROGRESS": "OPEN", "CLOSED": "CLOSE"})
     return frame
-
-def page_heading(eyebrow, title, subtitle):
-    st.markdown(f'<div class="page-eyebrow">{eyebrow}</div><h1>{title}</h1><div class="page-subtitle">{subtitle}</div>', unsafe_allow_html=True)
 
 def status_counts(frame):
     statuses = frame.get("Status", pd.Series(dtype=str)).fillna("").astype(str).str.upper().str.strip()
